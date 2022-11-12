@@ -31,7 +31,8 @@ def calibration(chessboardSize, fileExtension, resize_percentage):
 
     images = glob.glob('*.jpg')
     out_dir = "./calibration_results"
-    os.mkdir(out_dir)
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
 
     tmp = cv2.imread(images[0])
     width = int(tmp.shape[1] * resize_percentage / 100)
