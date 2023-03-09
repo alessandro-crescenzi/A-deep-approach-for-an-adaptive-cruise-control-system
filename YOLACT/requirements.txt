@@ -1,0 +1,8 @@
+torch~=1.14.0.dev20221111+cu116
+opencv-python~=4.6.0.66
+numpy~=1.23.4
+pycocotools~=2.0.6
+matplotlib~=3.6.2
+torchvision~=0.15.0.dev20221111+cu116
+Pillow~=9.3.0
+setuptools~=57.0.0
