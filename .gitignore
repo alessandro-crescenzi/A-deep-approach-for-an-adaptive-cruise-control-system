@@ -162,3 +162,7 @@ cython_debug/
 # video files
 *.MP4
 *.mp4
+
+#YOLACT folder
+./YOLACT/weights
+/YOLACT/data/cityscapes/images
