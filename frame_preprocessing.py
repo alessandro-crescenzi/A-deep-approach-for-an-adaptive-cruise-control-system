@@ -2,10 +2,10 @@ import cv2
 import os
 
 def main():
-    newpath = r'C:\Users\Alvaro\Desktop\Computer vision and cognitive systems\preprocessed_frames' 
+    newpath = r'PATH' 
     if not os.path.exists(newpath):
         os.makedirs(newpath)
-    capture = cv2.VideoCapture(r'C:\Users\Alvaro\Desktop\Computer vision and cognitive systems\examplee.MP4')
+    capture = cv2.VideoCapture(r'PATH')
     i = 0
     
     while (True):
