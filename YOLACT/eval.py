@@ -163,7 +163,7 @@ mapping = {
 }
 
 
-def prep_display(dets_out, gtsr_net, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str='',
+def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str='',
                  path=''):
     """
     Note: If undo_transform=False then im_h and im_w are allowed to be None.
@@ -664,12 +664,12 @@ def badhash(x):
     return x
 
 
-def evalimage(net: Yolact, gtsr_net, path: str, save_path: str = None):
+def evalimage(net: Yolact, path: str, save_path: str = None, gtsr_net=None):
     frame = torch.from_numpy(cv2.imread(path)).cuda().float()
     batch = FastBaseTransform()(frame.unsqueeze(0))
     preds = net(batch)
 
-    img_numpy = prep_display(preds, gtsr_net, frame, None, None, undo_transform=False, path=path)
+    img_numpy = prep_display(preds, frame, None, None, gtsr_net=gtsr_net,undo_transform=False, path=path)
 
     if save_path is None:
         img_numpy = img_numpy[:, :, (2, 1, 0)]
@@ -682,7 +682,7 @@ def evalimage(net: Yolact, gtsr_net, path: str, save_path: str = None):
         cv2.imwrite(save_path, img_numpy)
 
 
-def evalimages(net: Yolact, gtsr_net, input_folder: str, output_folder: str):
+def evalimages(net: Yolact, input_folder: str, output_folder: str, gtsr_net=None):
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
 
@@ -693,7 +693,7 @@ def evalimages(net: Yolact, gtsr_net, input_folder: str, output_folder: str):
         name = '.'.join(name.split('.')[:-1]) + '.png'
         out_path = os.path.join(output_folder, name)
 
-        evalimage(net, gtsr_net, path, out_path)
+        evalimage(net, path, out_path, gtsr_net=gtsr_net)
         print(path + ' -> ' + out_path)
     print('Done.')
 
@@ -946,7 +946,7 @@ def evalvideo(net: Yolact, path: str, out_path: str = None):
     cleanup_and_exit()
 
 
-def evaluate(net: Yolact, gtsr_net, dataset, train_mode=False):
+def evaluate(net: Yolact, dataset, gtsr_net=None, train_mode=False):
     net.detect.use_fast_nms = args.fast_nms
     net.detect.use_cross_class_nms = args.cross_class_nms
     cfg.mask_proto_debug = args.mask_proto_debug
@@ -955,13 +955,13 @@ def evaluate(net: Yolact, gtsr_net, dataset, train_mode=False):
     if args.image is not None:
         if ':' in args.image:
             inp, out = args.image.split(':')
-            evalimage(net, gtsr_net, inp, out)
+            evalimage(net,inp, out, gtsr_net=gtsr_net)
         else:
-            evalimage(net, gtsr_net, args.image)
+            evalimage(net, args.image, gtsr_net=gtsr_net)
         return
     elif args.images is not None:
         inp, out = args.images.split(':')
-        evalimages(net, gtsr_net, inp, out)
+        evalimages(net, inp, out, gtsr_net=gtsr_net)
         return
     elif args.video is not None:
         if ':' in args.video:
@@ -1176,14 +1176,18 @@ if __name__ == '__main__':
         net = Yolact()
         net.load_weights(args.trained_model)
         net.eval()
-        gtsr_net = ResnetGTSRB(13)
-        state_dict = torch.load("./gtsr/weights/resnetGTSRB_39_5880.pth")
-        gtsr_net.load_state_dict(state_dict)
-        gtsr_net.eval()
+
+        gtsr_net = None
+        if args.use_gtsrb:
+            gtsr_net = ResnetGTSRB(13)
+            state_dict = torch.load("GTSRB/weights/resnetGTSRB_39_5880.pth")
+            gtsr_net.load_state_dict(state_dict)
+            gtsr_net.eval()
         print(' Done.')
 
         if args.cuda:
             net = net.cuda()
-            gtsr_net = gtsr_net.cuda()
+            if args.use_gtsrb:
+                gtsr_net = gtsr_net.cuda()
 
-        evaluate(net, gtsr_net, dataset)
+        evaluate(net, dataset, gtsr_net)

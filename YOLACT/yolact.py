@@ -479,8 +479,6 @@ class Yolact(nn.Module):
 
         # self.load_weights("./weights/yolact_resnet50_54_800000.pth")
 
-        print("end loading")
-
     def save_weights(self, path):
         """ Saves the model's weights using compression because the file sizes were getting too big. """
         torch.save(self.state_dict(), path)
