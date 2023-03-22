@@ -12,6 +12,9 @@ patterns = {
 }
 data = {key: [] for key in patterns}
 
+if not os.path.exists("../results"):
+	os.makedirs("../results")
+
 for line in inp.split('\n'):
 	for key, pattern in patterns.items():
 		f = pattern.search(line)
@@ -58,7 +61,8 @@ def plot_train(data):
 		loss_names.append('Segmentation Loss')
 
 	plt.legend(loss_names)
-	plt.show()
+	# plt.show()
+	plt.savefig(f"../results/{open(sys.argv[1].split('.')[0])}_trainlosses.png")
 
 def plot_val(data):
 	plt.title(os.path.basename(sys.argv[1]) + ' Validation mAP')
@@ -70,7 +74,8 @@ def plot_val(data):
 	plt.plot(x, [x[0]['all'] for x in data if x[0]['type'] == 'mask'])
 
 	plt.legend(['BBox mAP', 'Mask mAP'])
-	plt.show()
+	# plt.show()
+	plt.savefig(f"../results/{open(sys.argv[1].split('.')[0])}_mAPvalidation.png")
 
 if len(sys.argv) > 2 and sys.argv[2] == 'val':
 	plot_val(data['val'])

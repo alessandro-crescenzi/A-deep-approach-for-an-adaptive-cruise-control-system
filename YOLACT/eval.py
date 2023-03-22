@@ -1,3 +1,5 @@
+import torchvision.transforms
+
 from data import COCODetection, get_label_map, MEANS, COLORS
 from yolact import Yolact
 from utils.augmentations import BaseTransform, FastBaseTransform, Resize
@@ -7,7 +9,6 @@ from utils import timer
 from utils.functions import SavePath
 from layers.output_utils import postprocess, undo_image_transformation
 import pycocotools
-
 from data import cfg, set_cfg, set_dataset
 
 import numpy as np
@@ -25,9 +26,16 @@ from collections import defaultdict
 from pathlib import Path
 from collections import OrderedDict
 from PIL import Image
+from GTSRB.data import data_transforms, data_jitter_hue, data_jitter_brightness, data_jitter_saturation, \
+    data_jitter_contrast, data_blur, data_rotate, data_center, data_affine, data_perspective  # data
+from GTSRB.model import ResnetGTSRB, StnGTSRB
 
 import matplotlib.pyplot as plt
 import cv2
+
+transforms = [data_transforms, data_jitter_hue, data_jitter_brightness, data_jitter_saturation,
+              data_jitter_contrast, data_blur, data_rotate, data_center, data_affine, data_perspective]
+
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -36,6 +44,7 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
@@ -113,9 +122,13 @@ def parse_args(argv=None):
                         help='When displaying / saving video, draw the FPS on the frame')
     parser.add_argument('--emulate_playback', default=False, dest='emulate_playback', action='store_true',
                         help='When saving a video, emulate the framerate that you\'d get running in real-time mode.')
+    parser.add_argument('--use_gtsrb', default=False,
+                        help='When display results for traffic sign, split speed limit traffic sign and unknown')
 
-    parser.set_defaults(no_bar=False, display=False, resume=False, output_coco_json=False, output_web_json=False, shuffle=False,
-                        benchmark=False, no_sort=False, no_hash=False, mask_proto_debug=False, crop=True, detect=False, display_fps=False,
+    parser.set_defaults(no_bar=False, display=False, resume=False, output_coco_json=False, output_web_json=False,
+                        shuffle=False,
+                        benchmark=False, no_sort=False, no_hash=False, mask_proto_debug=False, crop=True, detect=False,
+                        display_fps=False,
                         emulate_playback=False)
 
     global args
@@ -123,16 +136,35 @@ def parse_args(argv=None):
 
     if args.output_web_json:
         args.output_coco_json = True
-    
+
     if args.seed is not None:
         random.seed(args.seed)
 
+
 iou_thresholds = [x / 100 for x in range(50, 100, 5)]
-coco_cats = {} # Call prep_coco_cats to fill this
+coco_cats = {}  # Call prep_coco_cats to fill this
 coco_cats_inv = {}
 color_cache = defaultdict(lambda: {})
 
-def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str=''):
+mapping = {
+    0: "Speed Limit 20Kph",
+    1: "Speed Limit 30Kph",
+    2: "Speed Limit 50Kph",
+    3: "Speed Limit 60Kph",
+    4: "Speed Limit 70Kph",
+    5: "Speed Limit 80Kph",
+    6: "End Speed Limit 80Kph",
+    7: "Speed Limit 100Kph",
+    8: "Speed Limit 120Kph",
+    9: "Yield",
+    10: "Stop",
+    11: "End of Speed Limits",
+    12: "Unknown"
+}
+
+
+def prep_display(dets_out, gtsr_net, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str='',
+                 path=''):
     """
     Note: If undo_transform=False then im_h and im_w are allowed to be None.
     """
@@ -141,19 +173,20 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
         img_gpu = torch.Tensor(img_numpy).cuda()
     else:
         img_gpu = img / 255.0
+        img = img / 255.0
         h, w, _ = img.shape
-    
+
     with timer.env('Postprocess'):
         save = cfg.rescore_bbox
         cfg.rescore_bbox = True
-        t = postprocess(dets_out, w, h, visualize_lincomb = args.display_lincomb,
-                                        crop_masks        = args.crop,
-                                        score_threshold   = args.score_threshold)
+        t = postprocess(dets_out, w, h, visualize_lincomb=args.display_lincomb,
+                        crop_masks=args.crop,
+                        score_threshold=args.score_threshold)
         cfg.rescore_bbox = save
 
     with timer.env('Copy'):
         idx = t[1].argsort(0, descending=True)[:args.top_k]
-        
+
         if cfg.eval_mask_branch:
             # Masks are drawn on the GPU, so don't copy
             masks = t[3][idx]
@@ -165,19 +198,20 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
             num_dets_to_consider = j
             break
 
-    for j in reversed(range(num_dets_to_consider)):
-        x1, y1, x2, y2 = boxes[j, :]
-        if (x1 < w / 2 < x2) and (y1 < h / 2 < y2) and cfg.dataset.class_names[classes[j]] == 'car':
-            img2 = img[y1:y2, x1:x2, :]
-            img2 = img2.cpu().numpy()
-            cv2.imwrite(f"cropped_car{j}.jpg", img2)
+    path_car = "results/cropped_car"
+    path_ts = "results/cropped_ts"
+
+    if not os.path.isdir(path_ts):
+        os.mkdir(path_ts)
+    if not os.path.isdir(path_car):
+        os.mkdir(path_car)
 
     # Quick and dirty lambda for selecting the color for a particular index
     # Also keeps track of a per-gpu color cache for maximum speed
     def get_color(j, on_gpu=None):
         global color_cache
         color_idx = (classes[j] * 5 if class_color else j * 5) % len(COLORS)
-        
+
         if on_gpu is not None and color_idx in color_cache[on_gpu]:
             return color_cache[on_gpu][color_idx]
         else:
@@ -196,35 +230,35 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
     if args.display_masks and cfg.eval_mask_branch and num_dets_to_consider > 0:
         # After this, mask is of size [num_dets, h, w, 1]
         masks = masks[:num_dets_to_consider, :, :, None]
-        
+
         # Prepare the RGB images for each mask given their color (size [num_dets, h, w, 1])
-        colors = torch.cat([get_color(j, on_gpu=img_gpu.device.index).view(1, 1, 1, 3) for j in range(num_dets_to_consider)], dim=0)
+        colors = torch.cat(
+            [get_color(j, on_gpu=img_gpu.device.index).view(1, 1, 1, 3) for j in range(num_dets_to_consider)], dim=0)
         masks_color = masks.repeat(1, 1, 1, 3) * colors * mask_alpha
 
         # This is 1 everywhere except for 1-mask_alpha where the mask is
         inv_alph_masks = masks * (-mask_alpha) + 1
-        
+
         # I did the math for this on pen and paper. This whole block should be equivalent to:
         #    for j in range(num_dets_to_consider):
         #        img_gpu = img_gpu * inv_alph_masks[j] + masks_color[j]
         masks_color_summand = masks_color[0]
         if num_dets_to_consider > 1:
-            inv_alph_cumul = inv_alph_masks[:(num_dets_to_consider-1)].cumprod(dim=0)
+            inv_alph_cumul = inv_alph_masks[:(num_dets_to_consider - 1)].cumprod(dim=0)
             masks_color_cumul = masks_color[1:] * inv_alph_cumul
             masks_color_summand += masks_color_cumul.sum(dim=0)
 
         img_gpu = img_gpu * inv_alph_masks.prod(dim=0) + masks_color_summand
-    
+
     if args.display_fps:
-            # Draw the box for the fps on the GPU
+        # Draw the box for the fps on the GPU
         font_face = cv2.FONT_HERSHEY_DUPLEX
         font_scale = 0.6
         font_thickness = 1
 
         text_w, text_h = cv2.getTextSize(fps_str, font_face, font_scale, font_thickness)[0]
 
-        img_gpu[0:text_h+8, 0:text_w+8] *= 0.6 # 1 - Box alpha
-
+        img_gpu[0:text_h + 8, 0:text_w + 8] *= 0.6  # 1 - Box alpha
 
     # Then draw the stuff that needs to be done on the cpu
     # Note, make sure this is a uint8 tensor or opencv will not anti alias text for whatever reason
@@ -236,7 +270,7 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
         text_color = [255, 255, 255]
 
         cv2.putText(img_numpy, fps_str, text_pt, font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-    
+
     if num_dets_to_consider == 0:
         return img_numpy
 
@@ -250,7 +284,31 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
                 cv2.rectangle(img_numpy, (x1, y1), (x2, y2), color, 1)
 
             if args.display_text:
-                _class = cfg.dataset.class_names[classes[j]]
+                if args.use_gtsrb:
+                    _class = cfg.dataset.class_names[classes[j]]
+                    if _class == 'traffic sign':
+                        _h = y2 - y1
+                        _w = x2 - x1
+                        if (_w <= _h + _h / 2) and (_h <= _w + _w / 2):
+                            ts = img[y1:y2, x1:x2, :]
+                            ts = ts.swapaxes(1, 2)
+                            ts = ts.swapaxes(0, 1)
+                            _output = torch.zeros([1, 13], dtype=torch.float32)
+                            for i in range(0, len(transforms)):
+                                data = transforms[i](ts)
+                                data = data.unsqueeze(0)
+                                data = Variable(data)
+                                # data = data.cuda()
+                                _output = _output.add(gtsr_net(data))
+                            _output = gtsr_net(data)
+                            pred = _output.data.max(1, keepdim=True)[1]
+                            _class = mapping[pred.data.item()]
+
+                    if _class == 'Unknown' or _class == 'traffic sign':
+                        continue
+                else:
+                    _class = cfg.dataset.class_names[classes[j]]
+
                 text_str = '%s: %.2f' % (_class, score) if args.display_scores else _class
 
                 font_face = cv2.FONT_HERSHEY_DUPLEX
@@ -263,10 +321,11 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
                 text_color = [255, 255, 255]
 
                 cv2.rectangle(img_numpy, (x1, y1), (x1 + text_w, y1 - text_h - 4), color, -1)
-                cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-            
-    
+                cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
+                            cv2.LINE_AA)
+
     return img_numpy
+
 
 def prep_benchmark(dets_out, h, w):
     with timer.env('Postprocess'):
@@ -282,10 +341,11 @@ def prep_benchmark(dets_out, h, w):
         classes = classes.cpu().numpy()
         boxes = boxes.cpu().numpy()
         masks = masks.cpu().numpy()
-    
+
     with timer.env('Sync'):
         # Just in case
         torch.cuda.synchronize()
+
 
 def prep_coco_cats():
     """ Prepare inverted table for category id lookup given a coco cats object. """
@@ -299,6 +359,7 @@ def get_coco_cat(transformed_cat_id):
     """ transformed_cat_id is [0,80) as indices in cfg.dataset.class_names """
     return coco_cats[transformed_cat_id]
 
+
 def get_transformed_cat(coco_cat_id):
     """ transformed_cat_id is [0,80) as indices in cfg.dataset.class_names """
     return coco_cats_inv[coco_cat_id]
@@ -310,12 +371,12 @@ class Detections:
         self.bbox_data = []
         self.mask_data = []
 
-    def add_bbox(self, image_id:int, category_id:int, bbox:list, score:float):
+    def add_bbox(self, image_id: int, category_id: int, bbox: list, score: float):
         """ Note that bbox should be a list or tuple of (x1, y1, x2, y2) """
-        bbox = [bbox[0], bbox[1], bbox[2]-bbox[0], bbox[3]-bbox[1]]
+        bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
 
         # Round to the nearest 10th to avoid huge file sizes, as COCO suggests
-        bbox = [round(float(x)*10)/10 for x in bbox]
+        bbox = [round(float(x) * 10) / 10 for x in bbox]
 
         self.bbox_data.append({
             'image_id': int(image_id),
@@ -324,10 +385,10 @@ class Detections:
             'score': float(score)
         })
 
-    def add_mask(self, image_id:int, category_id:int, segmentation:np.ndarray, score:float):
+    def add_mask(self, image_id: int, category_id: int, segmentation: np.ndarray, score: float):
         """ The segmentation should be the full mask, the size of the image and with size [h, w]. """
         rle = pycocotools.mask.encode(np.asfortranarray(segmentation.astype(np.uint8)))
-        rle['counts'] = rle['counts'].decode('ascii') # json.dump doesn't like bytes strings
+        rle['counts'] = rle['counts'].decode('ascii')  # json.dump doesn't like bytes strings
 
         self.mask_data.append({
             'image_id': int(image_id),
@@ -335,7 +396,7 @@ class Detections:
             'segmentation': rle,
             'score': float(score)
         })
-    
+
     def dump(self):
         dump_arguments = [
             (self.bbox_data, args.bbox_det_file),
@@ -345,15 +406,15 @@ class Detections:
         for data, path in dump_arguments:
             with open(path, 'w') as f:
                 json.dump(data, f)
-    
+
     def dump_web(self):
         """ Dumps it in the format for my web app. Warning: bad code ahead! """
         config_outs = ['preserve_aspect_ratio', 'use_prediction_module',
-                        'use_yolo_regressors', 'use_prediction_matching',
-                        'train_masks']
+                       'use_yolo_regressors', 'use_prediction_matching',
+                       'train_masks']
 
         output = {
-            'info' : {
+            'info': {
                 'Config': {key: getattr(cfg, key) for key in config_outs},
             }
         }
@@ -376,21 +437,21 @@ class Detections:
 
         with open(os.path.join(args.web_det_path, '%s.json' % cfg.name), 'w') as f:
             json.dump(output, f)
-        
 
-        
 
 def _mask_iou(mask1, mask2, iscrowd=False):
     with timer.env('Mask IoU'):
         ret = mask_iou(mask1, mask2, iscrowd)
     return ret.cpu()
 
+
 def _bbox_iou(bbox1, bbox2, iscrowd=False):
     with timer.env('BBox IoU'):
         ret = jaccard(bbox1, bbox2, iscrowd)
     return ret.cpu()
 
-def prep_metrics(ap_data, dets, img, gt, gt_masks, h, w, num_crowd, image_id, detections:Detections=None):
+
+def prep_metrics(ap_data, dets, img, gt, gt_masks, h, w, num_crowd, image_id, detections: Detections = None):
     """ Returns a list of APs for this image, with each element being for a class  """
     if not args.output_coco_json:
         with timer.env('Prepare gt'):
@@ -398,16 +459,17 @@ def prep_metrics(ap_data, dets, img, gt, gt_masks, h, w, num_crowd, image_id, de
             gt_boxes[:, [0, 2]] *= w
             gt_boxes[:, [1, 3]] *= h
             gt_classes = list(gt[:, 4].astype(int))
-            gt_masks = torch.Tensor(gt_masks).view(-1, h*w)
+            gt_masks = torch.Tensor(gt_masks).view(-1, h * w)
 
             if num_crowd > 0:
                 split = lambda x: (x[-num_crowd:], x[:-num_crowd])
-                crowd_boxes  , gt_boxes   = split(gt_boxes)
-                crowd_masks  , gt_masks   = split(gt_masks)
+                crowd_boxes, gt_boxes = split(gt_boxes)
+                crowd_masks, gt_masks = split(gt_masks)
                 crowd_classes, gt_classes = split(gt_classes)
 
     with timer.env('Postprocess'):
-        classes, scores, boxes, masks = postprocess(dets, w, h, crop_masks=args.crop, score_threshold=args.score_threshold)
+        classes, scores, boxes, masks = postprocess(dets, w, h, crop_masks=args.crop,
+                                                    score_threshold=args.score_threshold)
 
         if classes.size(0) == 0:
             return
@@ -420,9 +482,8 @@ def prep_metrics(ap_data, dets, img, gt, gt_masks, h, w, num_crowd, image_id, de
             scores = list(scores.cpu().numpy().astype(float))
             box_scores = scores
             mask_scores = scores
-        masks = masks.view(-1, h*w).cuda()
+        masks = masks.view(-1, h * w).cuda()
         boxes = boxes.cuda()
-
 
     if args.output_coco_json:
         with timer.env('JSON Output'):
@@ -431,13 +492,13 @@ def prep_metrics(ap_data, dets, img, gt, gt_masks, h, w, num_crowd, image_id, de
             for i in range(masks.shape[0]):
                 # Make sure that the bounding box actually makes sense and a mask was produced
                 if (boxes[i, 3] - boxes[i, 1]) * (boxes[i, 2] - boxes[i, 0]) > 0:
-                    detections.add_bbox(image_id, classes[i], boxes[i,:],   box_scores[i])
-                    detections.add_mask(image_id, classes[i], masks[i,:,:], mask_scores[i])
+                    detections.add_bbox(image_id, classes[i], boxes[i, :], box_scores[i])
+                    detections.add_mask(image_id, classes[i], masks[i, :, :], mask_scores[i])
             return
-    
+
     with timer.env('Eval Setup'):
         num_pred = len(classes)
-        num_gt   = len(gt_classes)
+        num_gt = len(gt_classes)
 
         mask_iou_cache = _mask_iou(masks, gt_masks)
         bbox_iou_cache = _bbox_iou(boxes.float(), gt_boxes.float())
@@ -453,44 +514,44 @@ def prep_metrics(ap_data, dets, img, gt, gt_masks, h, w, num_crowd, image_id, de
         mask_indices = sorted(box_indices, key=lambda i: -mask_scores[i])
 
         iou_types = [
-            ('box',  lambda i,j: bbox_iou_cache[i, j].item(),
-                     lambda i,j: crowd_bbox_iou_cache[i,j].item(),
-                     lambda i: box_scores[i], box_indices),
-            ('mask', lambda i,j: mask_iou_cache[i, j].item(),
-                     lambda i,j: crowd_mask_iou_cache[i,j].item(),
-                     lambda i: mask_scores[i], mask_indices)
+            ('box', lambda i, j: bbox_iou_cache[i, j].item(),
+             lambda i, j: crowd_bbox_iou_cache[i, j].item(),
+             lambda i: box_scores[i], box_indices),
+            ('mask', lambda i, j: mask_iou_cache[i, j].item(),
+             lambda i, j: crowd_mask_iou_cache[i, j].item(),
+             lambda i: mask_scores[i], mask_indices)
         ]
 
     timer.start('Main loop')
     for _class in set(classes + gt_classes):
         ap_per_iou = []
         num_gt_for_class = sum([1 for x in gt_classes if x == _class])
-        
+
         for iouIdx in range(len(iou_thresholds)):
             iou_threshold = iou_thresholds[iouIdx]
 
             for iou_type, iou_func, crowd_func, score_func, indices in iou_types:
                 gt_used = [False] * len(gt_classes)
-                
+
                 ap_obj = ap_data[iou_type][iouIdx][_class]
                 ap_obj.add_gt_positives(num_gt_for_class)
 
                 for i in indices:
                     if classes[i] != _class:
                         continue
-                    
+
                     max_iou_found = iou_threshold
                     max_match_idx = -1
                     for j in range(num_gt):
                         if gt_used[j] or gt_classes[j] != _class:
                             continue
-                            
+
                         iou = iou_func(i, j)
 
                         if iou > max_iou_found:
                             max_iou_found = iou
                             max_match_idx = j
-                    
+
                     if max_match_idx >= 0:
                         gt_used[max_match_idx] = True
                         ap_obj.push(score_func(i), True)
@@ -502,7 +563,7 @@ def prep_metrics(ap_data, dets, img, gt, gt_masks, h, w, num_crowd, image_id, de
                             for j in range(len(crowd_classes)):
                                 if crowd_classes[j] != _class:
                                     continue
-                                
+
                                 iou = crowd_func(i, j)
 
                                 if iou > iou_threshold:
@@ -527,10 +588,10 @@ class APDataObject:
         self.data_points = []
         self.num_gt_positives = 0
 
-    def push(self, score:float, is_true:bool):
+    def push(self, score: float, is_true: bool):
         self.data_points.append((score, is_true))
-    
-    def add_gt_positives(self, num_positives:int):
+
+    def add_gt_positives(self, num_positives: int):
         """ Call this once per image. """
         self.num_gt_positives += num_positives
 
@@ -547,18 +608,20 @@ class APDataObject:
         self.data_points.sort(key=lambda x: -x[0])
 
         precisions = []
-        recalls    = []
-        num_true  = 0
+        recalls = []
+        num_true = 0
         num_false = 0
 
         # Compute the precision-recall curve. The x axis is recalls and the y axis precisions.
         for datum in self.data_points:
             # datum[1] is whether the detection a true or false positive
-            if datum[1]: num_true += 1
-            else: num_false += 1
-            
+            if datum[1]:
+                num_true += 1
+            else:
+                num_false += 1
+
             precision = num_true / (num_true + num_false)
-            recall    = num_true / self.num_gt_positives
+            recall = num_true / self.num_gt_positives
 
             precisions.append(precision)
             recalls.append(recall)
@@ -566,12 +629,12 @@ class APDataObject:
         # Smooth the curve by computing [max(precisions[i:]) for i in range(len(precisions))]
         # Basically, remove any temporary dips from the curve.
         # At least that's what I think, idk. COCOEval did it so I do too.
-        for i in range(len(precisions)-1, 0, -1):
-            if precisions[i] > precisions[i-1]:
-                precisions[i-1] = precisions[i]
+        for i in range(len(precisions) - 1, 0, -1):
+            if precisions[i] > precisions[i - 1]:
+                precisions[i - 1] = precisions[i]
 
         # Compute the integral of precision(recall) d_recall from recall=0->1 using fixed-length riemann summation with 101 bars.
-        y_range = [0] * 101 # idx 0 is recall == 0.0 and idx 100 is recall == 1.00
+        y_range = [0] * 101  # idx 0 is recall == 0.0 and idx 100 is recall == 1.00
         x_range = np.array([x / 100 for x in range(101)])
         recalls = np.array(recalls)
 
@@ -587,6 +650,7 @@ class APDataObject:
         # avg([precision(x) for x in 0:0.01:1])
         return sum(y_range) / len(y_range)
 
+
 def badhash(x):
     """
     Just a quick and dirty hash function for doing a deterministic shuffle based on image_id.
@@ -596,16 +660,17 @@ def badhash(x):
     """
     x = (((x >> 16) ^ x) * 0x045d9f3b) & 0xFFFFFFFF
     x = (((x >> 16) ^ x) * 0x045d9f3b) & 0xFFFFFFFF
-    x =  ((x >> 16) ^ x) & 0xFFFFFFFF
+    x = ((x >> 16) ^ x) & 0xFFFFFFFF
     return x
 
-def evalimage(net:Yolact, path:str, save_path:str=None):
+
+def evalimage(net: Yolact, gtsr_net, path: str, save_path: str = None):
     frame = torch.from_numpy(cv2.imread(path)).cuda().float()
     batch = FastBaseTransform()(frame.unsqueeze(0))
     preds = net(batch)
 
-    img_numpy = prep_display(preds, frame, None, None, undo_transform=False)
-    
+    img_numpy = prep_display(preds, gtsr_net, frame, None, None, undo_transform=False, path=path)
+
     if save_path is None:
         img_numpy = img_numpy[:, :, (2, 1, 0)]
 
@@ -616,50 +681,55 @@ def evalimage(net:Yolact, path:str, save_path:str=None):
     else:
         cv2.imwrite(save_path, img_numpy)
 
-def evalimages(net:Yolact, input_folder:str, output_folder:str):
+
+def evalimages(net: Yolact, gtsr_net, input_folder: str, output_folder: str):
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
 
     print()
-    for p in Path(input_folder).glob('*'): 
+    for p in Path(input_folder).glob('*'):
         path = str(p)
         name = os.path.basename(path)
         name = '.'.join(name.split('.')[:-1]) + '.png'
         out_path = os.path.join(output_folder, name)
 
-        evalimage(net, path, out_path)
+        evalimage(net, gtsr_net, path, out_path)
         print(path + ' -> ' + out_path)
     print('Done.')
+
 
 from multiprocessing.pool import ThreadPool
 from queue import Queue
 
+
 class CustomDataParallel(torch.nn.DataParallel):
     """ A Custom Data Parallel class that properly gathers lists of dictionaries. """
+
     def gather(self, outputs, output_device):
         # Note that I don't actually want to convert everything to the output_device
         return sum(outputs, [])
 
-def evalvideo(net:Yolact, path:str, out_path:str=None):
+
+def evalvideo(net: Yolact, path: str, out_path: str = None):
     # If the path is a digit, parse it as a webcam index
     is_webcam = path.isdigit()
-    
+
     # If the input image size is constant, this make things faster (hence why we can use it in a video setting).
     cudnn.benchmark = True
-    
+
     if is_webcam:
         vid = cv2.VideoCapture(int(path))
     else:
         vid = cv2.VideoCapture(path)
-    
+
     if not vid.isOpened():
         print('Could not open video "%s"' % path)
         exit(-1)
 
-    target_fps   = round(vid.get(cv2.CAP_PROP_FPS))
-    frame_width  = round(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
+    target_fps = round(vid.get(cv2.CAP_PROP_FPS))
+    frame_width = round(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = round(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    
+
     if is_webcam:
         num_frames = float('inf')
     else:
@@ -721,7 +791,7 @@ def evalvideo(net:Yolact, path:str, out_path:str=None):
     frame_buffer = Queue()
     video_fps = 0
 
-    # All this timing code to make sure that 
+    # All this timing code to make sure that
     def play_video():
         try:
             nonlocal frame_buffer, running, video_fps, is_webcam, num_frames, frames_displayed, vid_done
@@ -756,9 +826,8 @@ def evalvideo(net:Yolact, path:str, out_path:str=None):
                         progress_bar.set_val(frames_displayed)
 
                         print('\rProcessing Frames  %s %6d / %6d (%5.2f%%)    %5.2f fps        '
-                            % (repr(progress_bar), frames_displayed, num_frames, progress, fps), end='')
+                              % (repr(progress_bar), frames_displayed, num_frames, progress, fps), end='')
 
-                
                 # This is split because you don't want savevideo to require cv2 display functionality (see #197)
                 if out_path is None and cv2.waitKey(1) == 27:
                     # Press Escape to close
@@ -780,8 +849,8 @@ def evalvideo(net:Yolact, path:str, out_path:str=None):
                     new_target = frame_time_target
 
                 next_frame_target = max(2 * new_target - video_frame_times.get_avg(), 0)
-                target_time = frame_time_start + next_frame_target - 0.001 # Let's just subtract a millisecond to be safe
-                
+                target_time = frame_time_start + next_frame_target - 0.001  # Let's just subtract a millisecond to be safe
+
                 if out_path is None or args.emulate_playback:
                     # This gives more accurate timing than if sleeping the whole amount at once
                     while time.time() < target_time:
@@ -794,8 +863,8 @@ def evalvideo(net:Yolact, path:str, out_path:str=None):
             import traceback
             traceback.print_exc()
 
-
-    extract_frame = lambda x, i: (x[0][i] if x[1][i]['detection'] is None else x[0][i].to(x[1][i]['detection']['box'].device), [x[1][i]])
+    extract_frame = lambda x, i: (
+        x[0][i] if x[1][i]['detection'] is None else x[0][i].to(x[1][i]['detection']['box'].device), [x[1][i]])
 
     # Prime the network on the first frame because I do some thread unsafe things otherwise
     print('Initializing model... ', end='')
@@ -823,16 +892,16 @@ def evalvideo(net:Yolact, path:str, out_path:str=None):
                 next_frames = pool.apply_async(get_next_frame, args=(vid,))
             else:
                 next_frames = None
-            
+
             if not (vid_done and len(active_frames) == 0):
                 # For each frame in our active processing queue, dispatch a job
                 # for that frame using the current function in the sequence
                 for frame in active_frames:
-                    _args =  [frame['value']]
+                    _args = [frame['value']]
                     if frame['idx'] == 0:
                         _args.append(fps_str)
                     frame['value'] = pool.apply_async(sequence[frame['idx']], args=_args)
-                
+
                 # For each frame whose job was the last in the sequence (i.e. for all final outputs)
                 for frame in active_frames:
                     if frame['idx'] == 0:
@@ -848,33 +917,36 @@ def evalvideo(net:Yolact, path:str, out_path:str=None):
 
                     if frame['idx'] == 0:
                         # Split this up into individual threads for prep_frame since it doesn't support batch size
-                        active_frames += [{'value': extract_frame(frame['value'], i), 'idx': 0} for i in range(1, len(frame['value'][0]))]
+                        active_frames += [{'value': extract_frame(frame['value'], i), 'idx': 0} for i in
+                                          range(1, len(frame['value'][0]))]
                         frame['value'] = extract_frame(frame['value'], 0)
-                
+
                 # Finish loading in the next frames and add them to the processing queue
                 if next_frames is not None:
                     frames = next_frames.get()
                     if len(frames) == 0:
                         vid_done = True
                     else:
-                        active_frames.append({'value': frames, 'idx': len(sequence)-1})
+                        active_frames.append({'value': frames, 'idx': len(sequence) - 1})
 
                 # Compute FPS
                 frame_times.add(time.time() - start_time)
                 fps = args.video_multiframe / frame_times.get_avg()
             else:
                 fps = 0
-            
-            fps_str = 'Processing FPS: %.2f | Video Playback FPS: %.2f | Frames in Buffer: %d' % (fps, video_fps, frame_buffer.qsize())
+
+            fps_str = 'Processing FPS: %.2f | Video Playback FPS: %.2f | Frames in Buffer: %d' % (
+                fps, video_fps, frame_buffer.qsize())
             if not args.display_fps:
                 print('\r' + fps_str + '    ', end='')
 
     except KeyboardInterrupt:
         print('\nStopping...')
-    
+
     cleanup_and_exit()
 
-def evaluate(net:Yolact, dataset, train_mode=False):
+
+def evaluate(net: Yolact, gtsr_net, dataset, train_mode=False):
     net.detect.use_fast_nms = args.fast_nms
     net.detect.use_cross_class_nms = args.cross_class_nms
     cfg.mask_proto_debug = args.mask_proto_debug
@@ -883,13 +955,13 @@ def evaluate(net:Yolact, dataset, train_mode=False):
     if args.image is not None:
         if ':' in args.image:
             inp, out = args.image.split(':')
-            evalimage(net, inp, out)
+            evalimage(net, gtsr_net, inp, out)
         else:
-            evalimage(net, args.image)
+            evalimage(net, gtsr_net, args.image)
         return
     elif args.images is not None:
         inp, out = args.images.split(':')
-        evalimages(net, inp, out)
+        evalimages(net, gtsr_net, inp, out)
         return
     elif args.video is not None:
         if ':' in args.video:
@@ -909,7 +981,7 @@ def evaluate(net:Yolact, dataset, train_mode=False):
         # For each class and iou, stores tuples (score, isPositive)
         # Index ap_data[type][iouIdx][classIdx]
         ap_data = {
-            'box' : [[APDataObject() for _ in cfg.dataset.class_names] for _ in iou_thresholds],
+            'box': [[APDataObject() for _ in cfg.dataset.class_names] for _ in iou_thresholds],
             'mask': [[APDataObject() for _ in cfg.dataset.class_names] for _ in iou_thresholds]
         }
         detections = Detections()
@@ -917,7 +989,7 @@ def evaluate(net:Yolact, dataset, train_mode=False):
         timer.disable('Load Data')
 
     dataset_indices = list(range(len(dataset)))
-    
+
     if args.shuffle:
         random.shuffle(dataset_indices)
     elif not args.no_sort:
@@ -961,12 +1033,12 @@ def evaluate(net:Yolact, dataset, train_mode=False):
                 prep_benchmark(preds, h, w)
             else:
                 prep_metrics(ap_data, preds, img, gt, gt_masks, h, w, num_crowd, dataset.ids[image_idx], detections)
-            
+
             # First couple of images take longer because we're constructing the graph.
             # Since that's technically initialization, don't include those in the FPS calculations.
             if it > 1:
                 frame_times.add(timer.total_time())
-            
+
             if args.display:
                 if it > 1:
                     print('Avg FPS: %.4f' % (1 / frame_times.get_avg()))
@@ -974,14 +1046,14 @@ def evaluate(net:Yolact, dataset, train_mode=False):
                 plt.title(str(dataset.ids[image_idx]))
                 plt.show()
             elif not args.no_bar:
-                if it > 1: fps = 1 / frame_times.get_avg()
-                else: fps = 0
-                progress = (it+1) / dataset_size * 100
-                progress_bar.set_val(it+1)
+                if it > 1:
+                    fps = 1 / frame_times.get_avg()
+                else:
+                    fps = 0
+                progress = (it + 1) / dataset_size * 100
+                progress_bar.set_val(it + 1)
                 print('\rProcessing Images  %s %6d / %6d (%5.2f%%)    %5.2f fps        '
-                    % (repr(progress_bar), it+1, dataset_size, progress, fps), end='')
-
-
+                      % (repr(progress_bar), it + 1, dataset_size, progress, fps), end='')
 
         if not args.display and not args.benchmark:
             print()
@@ -1004,7 +1076,7 @@ def evaluate(net:Yolact, dataset, train_mode=False):
             print('Stats for the last frame:')
             timer.print_stats()
             avg_seconds = frame_times.get_avg()
-            print('Average: %5.2f fps, %5.2f ms' % (1 / frame_times.get_avg(), 1000*avg_seconds))
+            print('Average: %5.2f fps, %5.2f ms' % (1 / frame_times.get_avg(), 1000 * avg_seconds))
 
     except KeyboardInterrupt:
         print('Stopping...')
@@ -1026,22 +1098,23 @@ def calc_map(ap_data):
 
     # Looking back at it, this code is really hard to read :/
     for iou_type in ('box', 'mask'):
-        all_maps[iou_type]['all'] = 0 # Make this first in the ordereddict
+        all_maps[iou_type]['all'] = 0  # Make this first in the ordereddict
         for i, threshold in enumerate(iou_thresholds):
             mAP = sum(aps[i][iou_type]) / len(aps[i][iou_type]) * 100 if len(aps[i][iou_type]) > 0 else 0
-            all_maps[iou_type][int(threshold*100)] = mAP
-        all_maps[iou_type]['all'] = (sum(all_maps[iou_type].values()) / (len(all_maps[iou_type].values())-1))
-    
+            all_maps[iou_type][int(threshold * 100)] = mAP
+        all_maps[iou_type]['all'] = (sum(all_maps[iou_type].values()) / (len(all_maps[iou_type].values()) - 1))
+
     print_maps(all_maps)
-    
+
     # Put in a prettier format so we can serialize it to json during training
     all_maps = {k: {j: round(u, 2) for j, u in v.items()} for k, v in all_maps.items()}
     return all_maps
 
+
 def print_maps(all_maps):
-    # Warning: hacky 
+    # Warning: hacky
     make_row = lambda vals: (' %5s |' * len(vals)) % tuple(vals)
-    make_sep = lambda n:  ('-------+' * n)
+    make_sep = lambda n: ('-------+' * n)
 
     print()
     print(make_row([''] + [('.%d ' % x if isinstance(x, int) else x + ' ') for x in all_maps['box'].keys()]))
@@ -1050,7 +1123,6 @@ def print_maps(all_maps):
         print(make_row([iou_type] + ['%.2f' % x if x < 100 else '%.1f' % x for x in all_maps[iou_type].values()]))
     print(make_sep(len(all_maps['box']) + 1))
     print()
-
 
 
 if __name__ == '__main__':
@@ -1098,17 +1170,20 @@ if __name__ == '__main__':
                                     transform=BaseTransform(), has_gt=cfg.dataset.has_gt)
             prep_coco_cats()
         else:
-            dataset = None        
+            dataset = None
 
         print('Loading model...', end='')
         net = Yolact()
         net.load_weights(args.trained_model)
         net.eval()
+        gtsr_net = ResnetGTSRB(13)
+        state_dict = torch.load("./gtsr/weights/resnetGTSRB_39_5880.pth")
+        gtsr_net.load_state_dict(state_dict)
+        gtsr_net.eval()
         print(' Done.')
 
         if args.cuda:
             net = net.cuda()
+            gtsr_net = gtsr_net.cuda()
 
-        evaluate(net, dataset)
-
-
+        evaluate(net, gtsr_net, dataset)

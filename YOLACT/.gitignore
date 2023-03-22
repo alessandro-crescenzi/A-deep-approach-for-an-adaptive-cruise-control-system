@@ -137,7 +137,7 @@ data/coco/images/
 data/coco/annotations/
 ap_data.pkl
 results/
-logs/
+# logs/
 scripts/aws/
 scripts/gt.npy
 scripts/proto.npy
