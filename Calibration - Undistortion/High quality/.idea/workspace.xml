@@ -3,9 +3,6 @@
   <component name="ChangeListManager">
     <list default="true" id="63d4c7d7-04a5-49a2-bd66-bf4a922ca1f8" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/calibration.py" beforeDir="false" afterPath="$PROJECT_DIR$/calibration.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../Low quality/calibrated_videos/prova.MP4" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../Low quality/prova.MP4" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,7 +36,7 @@
     <property name="node.js.detected.package.eslint" value="true" />
     <property name="node.js.selected.package.eslint" value="(autodetect)" />
   </component>
-  <component name="RunManager" selected="Python.video_undistortion">
+  <component name="RunManager" selected="Python.frame_extraction">
     <configuration name="calibration" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
       <module name="High quality" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -84,6 +81,28 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="frame_extraction" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+      <module name="High quality" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/calibrated_videos" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/calibrated_videos/frame_extraction.py" />
+      <option name="PARAMETERS" value="--video=1hq.MP4" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="video_undistortion" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="High quality" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -108,6 +127,7 @@
     </configuration>
     <list>
       <item itemvalue="Python.calibration" />
+      <item itemvalue="Python.frame_extraction" />
       <item itemvalue="Python.calibrazione_video" />
       <item itemvalue="Python.video_undistortion" />
     </list>
@@ -131,16 +151,31 @@
       <workItem from="1664090432616" duration="3733000" />
       <workItem from="1664100098537" duration="44000" />
       <workItem from="1665472354029" duration="3314000" />
+      <workItem from="1678901383820" duration="1841000" />
+      <workItem from="1679072250249" duration="429000" />
+      <workItem from="1679073005433" duration="1912000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/calibrated_videos/frame_extraction.py</url>
+          <line>51</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/Prova_calibrazione_dashcam$calibration.coverage" NAME="calibration Coverage Results" MODIFIED="1663956847270" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/High_quality$calibration.coverage" NAME="calibration Coverage Results" MODIFIED="1665472492999" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/High_quality$video_undistortion.coverage" NAME="video_undistortion Coverage Results" MODIFIED="1665472935040" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/High_quality$frame_extraction.coverage" NAME="frame_extraction Coverage Results" MODIFIED="1679074339121" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/calibrated_videos" />
     <SUITE FILE_PATH="coverage/Prova_calibrazione_dashcam$calibrazione_video.coverage" NAME="calibrazione_video Coverage Results" MODIFIED="1664094529284" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
