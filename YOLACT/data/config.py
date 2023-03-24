@@ -675,7 +675,7 @@ yolact_base_config = coco_base_config.copy({
     'num_classes': len(cityscapes_fine_dataset.class_names) + 1,
 
     # Image Size
-    'max_size': 550,
+    'max_size': 700,
 
     # Training params
     'lr_steps': (280000, 600000, 700000, 750000),
