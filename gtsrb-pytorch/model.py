@@ -21,9 +21,6 @@ class StnGTSRB(nn.Module):
     def __init__(self, numClasses):
         super(StnGTSRB, self).__init__()
 
-        # self.resnet = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT)
-        # self.resnet.fc = nn.Linear(self.resnet.fc.in_features, numClasses)
-
         # CNN layers
         self.conv1 = nn.Conv2d(3, 64, kernel_size=5)
         self.bn1 = nn.BatchNorm2d(64)

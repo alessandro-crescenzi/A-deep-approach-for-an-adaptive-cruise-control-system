@@ -14,9 +14,7 @@ import numpy as np
 from model import ResnetGTSRB, StnGTSRB
 
 ### Data Initialization and Loading
-from utils.augmentation import data_transforms, data_jitter_hue, data_jitter_brightness, data_jitter_saturation, \
-    data_jitter_contrast, data_rotate, data_equalize, data_center, data_blur, \
-    data_perspective, data_affine  # augmentation.py in the same folder
+from utils.augmentation import *  # augmentation.py in the same folder
 from utils.train_val_test import initialize_data
 
 # Training settings
@@ -67,8 +65,13 @@ def train():
 
     initialize_data(args.data)  # extracts the zip files, makes a validation set
 
+    val_loader = torch.utils.data.DataLoader(
+        datasets.ImageFolder(args.data + '/val_images',
+                             transform=basic_transformation),
+        batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=use_gpu)
+
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, factor=0.5, verbose=True)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.5, verbose=True)
 
     # loss counters
     iteration = 0
@@ -92,34 +95,17 @@ def train():
             # Apply data transformations on the training images to augment dataset
             train_loader = torch.utils.data.DataLoader(
                 torch.utils.data.ConcatDataset([datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_transforms),
+                                                                     transform=basic_transformation),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_jitter_brightness),
+                                                                     transform=imadjust_transformation),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_jitter_saturation),
+                                                                     transform=histeq_transformation),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_jitter_contrast),
+                                                                     transform=adapthisteq_transformation),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_jitter_hue),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_blur),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_rotate),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_perspective),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_affine),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_equalize),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_center),
+                                                                     transform=conorm_transformation)
                                                 ]),
                 batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=use_gpu)
-
-            val_loader = torch.utils.data.DataLoader(
-                datasets.ImageFolder(args.data + '/val_images',
-                                     transform=data_transforms),
-                batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=use_gpu)
 
             for batch_idx, (images, target) in enumerate(train_loader):
                 images, target = Variable(images), Variable(target)
