@@ -8,38 +8,33 @@ from utils.preprocessing import *
 basic_transformation = transforms.Compose([
     transforms.Resize((48, 48)),
     transforms.ToTensor(),
-    transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739)),
-    transforms.RandomAffine((-5, 5), translate=(0.1, 0.1), scale=(0.9, 1.1))
+    transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739))
 ])
 
 imadjust_transformation = transforms.Compose([
     transforms.Resize((48, 48)),
     Imadjust(),
     transforms.ToTensor(),
-    transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739)),
-    transforms.RandomAffine((-5, 5), translate=(0.1, 0.1), scale=(0.9, 1.1))
+    transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739))
 ])
 
 histeq_transformation = transforms.Compose([
     transforms.Resize((48, 48)),
     Histeq(),
     transforms.ToTensor(),
-    transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739)),
-    transforms.RandomAffine((-5, 5), translate=(0.1, 0.1), scale=(0.9, 1.1))
+    transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739))
 ])
 
 adapthisteq_transformation = transforms.Compose([
     transforms.Resize((48, 48)),
     Adapthisteq(),
     transforms.ToTensor(),
-    transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739)),
-    transforms.RandomAffine((-5, 5), translate=(0.1, 0.1), scale=(0.9, 1.1))
+    transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739))
 ])
 
 conorm_transformation = transforms.Compose([
     transforms.Resize((48, 48)),
     Conorm(),
     transforms.ToTensor(),
-    transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739)),
-    transforms.RandomAffine((-5, 5), translate=(0.1, 0.1), scale=(0.9, 1.1))
+    transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739))
 ])

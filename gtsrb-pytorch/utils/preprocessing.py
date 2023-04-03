@@ -13,29 +13,32 @@ __all__ = [
 ]
 
 
-class Imadjust:
+class Imadjust(torch.nn.Module):
     def __init__(self):
+        super().__init__()
         _log_api_usage_once(self)
 
-    def __call__(self, pic):
+    def forward(self, pic):
         return F.adjust_contrast(pic, 2)
 
 
-class Histeq:
+class Histeq(torch.nn.Module):
     def __init__(self):
+        super().__init__()
         _log_api_usage_once(self)
 
-    def __call__(self, pic):
+    def forward(self, pic):
         return F.equalize(pic)
 
 
-class Adapthisteq:
+class Adapthisteq(torch.nn.Module):
     def __init__(self):
+        super().__init__()
         _log_api_usage_once(self)
 
-    def __call__(self, pic):
-        np_image = np.asarray(pic)
-        image = torchvision.transforms.ToTensor()(np_image)
+    def forward(self, pic):
+        np_image = np.array(pic)
+        image = torch.from_numpy(np_image)
         image = image.swapaxes(1, 2).swapaxes(0, 1)
 
         assert image.shape[1] == image.shape[2], "Error in image transformation height and weight are not equal"
@@ -53,10 +56,11 @@ class Adapthisteq:
         return torchvision.transforms.ToPILImage()(image)
 
 
-class Conorm:
+class Conorm(torch.nn.Module):
     def __init__(self):
+        super().__init__()
         _log_api_usage_once(self)
 
-    def __call__(self, pic):
+    def forward(self, pic):
         return F.gaussian_blur(pic, kernel_size=[5, 5], sigma=[1, 1])
 

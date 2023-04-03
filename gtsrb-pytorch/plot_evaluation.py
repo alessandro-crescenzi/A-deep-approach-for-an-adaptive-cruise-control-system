@@ -13,22 +13,21 @@ global args
 
 
 def plot(model_name):
-    numClasses = 13
+    numClasses = 12
 
     mapping = {
-        0: "20Kph",
-        1: "30Kph",
-        2: "50Kph",
-        3: "60Kph",
-        4: "70Kph",
-        5: "80Kph",
-        6: "End 80Kph",
-        7: "100Kph",
-        8: "120Kph",
-        9: "Yield",
-        10: "Stop",
-        11: "End All",
-        12: "Unknown"
+        0:  "20Kph",
+        1:  "30Kph",
+        2:  "50Kph",
+        3:  "60Kph",
+        4:  "70Kph",
+        5:  "80Kph",
+        6:  "100Kph",
+        7:  "120Kph",
+        8:  "Yield",
+        9:  "Stop",
+        10: "End All",
+        11: "Unknown"
     }
 
     df_cm = pd.read_csv(f'results/{model_name}_prediction.csv')

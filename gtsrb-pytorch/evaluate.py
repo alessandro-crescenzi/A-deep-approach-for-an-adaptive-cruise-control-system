@@ -9,10 +9,9 @@ from torch.autograd import Variable
 from model import ResnetGTSRB, StnGTSRB
 from torcheval.metrics import MulticlassConfusionMatrix
 from plot_evaluation import plot
+import torch.nn.functional as F
 
-from utils.augmentation import data_transforms, data_jitter_hue, data_jitter_brightness, data_jitter_saturation, \
-    data_jitter_contrast, data_rotate, data_equalize, data_center, data_blur, \
-    data_perspective, data_affine  # augmentation.py in the same folder
+from utils.eval_transformation import *
 
 # .py in the same folder
 
@@ -25,19 +24,18 @@ parser.add_argument('--max_voting', default=False,
                     help="the prediction is the max of the transformations applied")
 
 mapping = {
-    0: "Speed Limit 20Kph",
-    1: "Speed Limit 30Kph",
-    2: "Speed Limit 50Kph",
-    3: "Speed Limit 60Kph",
-    4: "Speed Limit 70Kph",
-    5: "Speed Limit 80Kph",
-    6: "End Speed Limit 80Kph",
-    7: "Speed Limit 100Kph",
-    8: "Speed Limit 120Kph",
-    9: "Yield",
-    10: "Stop",
-    11: "End of Speed Limits",
-    12: "Unknown"
+    0:  "Speed Limit 20Kph",
+    1:  "Speed Limit 30Kph",
+    2:  "Speed Limit 50Kph",
+    3:  "Speed Limit 60Kph",
+    4:  "Speed Limit 70Kph",
+    5:  "Speed Limit 80Kph",
+    6:  "Speed Limit 100Kph",
+    7:  "Speed Limit 120Kph",
+    8:  "Yield",
+    9:  "Stop",
+    10: "End of Speed Limits",
+    11: "Unknown"
 }
 
 global args
@@ -51,7 +49,7 @@ def pil_loader(path):
 
 
 def evaluate():
-    numClasses = 13
+    numClasses = 12
     target = []
 
     model_name = args.model.split('/')[1].split('.')[0]
@@ -63,9 +61,8 @@ def evaluate():
 
     test_dir = args.test_dir
 
-    transforms = [data_transforms, data_jitter_hue, data_jitter_brightness, data_jitter_saturation,
-                  data_jitter_contrast, data_blur, data_rotate, data_equalize, data_center, data_affine,
-                  data_perspective]
+    transformations = [basic_transformation, imadjust_transformation, histeq_transformation, adapthisteq_transformation,
+                       conorm_transformation]
 
     if 'test_images' in args.test_dir:
         data = pd.read_csv("data/test_images/GT-final_test.csv", delimiter=';')
@@ -90,16 +87,17 @@ def evaluate():
             output = torch.zeros([1, numClasses], dtype=torch.float32)
             with torch.no_grad():
                 if args.max_voting:
-                    for i in range(0, len(transforms)):
-                        data = transforms[i](pil_loader(test_dir + '/' + file))
+                    for i in range(0, len(transformations)):
+                        data = transformations[i](pil_loader(test_dir + '/' + file))
                         data = data.unsqueeze(0)
                         data = Variable(data)
                         output = output.add(model(data))
                 else:
-                    data = data_transforms(pil_loader(test_dir + '/' + file))
+                    data = basic_transformation(pil_loader(test_dir + '/' + file))
                     data = data.unsqueeze(0)
                     data = Variable(data)
                     output = model(data)
+                output = F.log_softmax(output, dim=1)
                 pred = output.data.max(1, keepdim=True)[1]
                 predictions[idx] = pred
 

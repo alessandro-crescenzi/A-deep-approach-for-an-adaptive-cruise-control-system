@@ -11,15 +11,15 @@ from torch.autograd import Variable
 import numpy as np
 
 # Neural Network and Optimizer
-from model import ResnetGTSRB, StnGTSRB
+from model import StnGTSRB
 
 ### Data Initialization and Loading
 from utils.augmentation import *  # augmentation.py in the same folder
-from utils.train_val_test import initialize_data
+from data.train_val_test import initialize_data
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch GTSRB example')
-parser.add_argument('--data', type=str, default='data', metavar='D',
+parser.add_argument('--data', type=str, default='', metavar='D',
                     help="folder where data is located. train_data.zip and test_data.zip must be here")
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
@@ -54,7 +54,7 @@ def train():
     if not os.path.exists(args.save_folder):
         os.mkdir(args.save_folder)
 
-    numClasses = 13
+    numClasses = 12
 
     model = StnGTSRB(numClasses)
 
