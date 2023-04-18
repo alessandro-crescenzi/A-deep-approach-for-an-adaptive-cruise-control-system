@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import torch
 from torcheval.metrics import MulticlassAccuracy, MulticlassPrecision, MulticlassRecall
 import pandas as pd
+import time
 
 parser = argparse.ArgumentParser(description='PyTorch GTSRB ploting performance')
 parser.add_argument('--model_name', type=str, metavar='M',
@@ -43,7 +44,7 @@ def plot(model_name):
     hm = sn.heatmap(df_cm, vmin=0, vmax=20, annot=True, fmt='g', linewidths=.3, square=True)  # font size
     hm.set(xlabel="predictions", ylabel="target")  # for label size
 
-    plt.savefig(f'results/{model_name}_cm_plot.png')
+    plt.savefig(f'results/{model_name}_cm_plot_{time.strftime("%Y%m%d-%H%M")}.png')
     # plt.show()
 
     # Accuracy
@@ -89,7 +90,9 @@ def plot(model_name):
     }
     apr_df = pd.DataFrame(df_dict)
 
-    print(apr_df.to_markdown())
+    f = open(f'results/{model_name}_AccPrecRec_{time.strftime("%Y%m%d-%H%M")}.txt', "a")
+
+    f.write(apr_df.to_markdown())
 
 
 if __name__ == '__main__':

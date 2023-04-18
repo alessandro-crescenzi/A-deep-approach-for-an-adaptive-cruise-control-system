@@ -51,7 +51,7 @@ def plot(file: str):
 
     plt.legend(loss_names)
     plt.show()
-    plt.savefig(f"../results/{file.split('.')[0]}_lossesPlot.png")
+    # plt.savefig(f"../results/{file.split('.')[0]}_lossesPlot.png")
 
 
 if __name__ == '__main__':

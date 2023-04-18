@@ -1,4 +1,5 @@
 torchvision~=0.15.1+cu117
+torch
 numpy~=1.24.2
 Pillow~=9.4.0
 pandas~=1.5.3

@@ -33,6 +33,8 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--save_folder', default='weights/',
                     help='Directory for saving checkpoint models.')
+parser.add_argument('--resume', type=str, default=None,
+                    help='Resuming training starting from this checkpoint')
 args = parser.parse_args()
 
 torch.manual_seed(args.seed)
@@ -58,10 +60,13 @@ def train():
 
     model = StnGTSRB(numClasses)
 
+    if args.resume is not None:
+        print('Resuming training, loading {}...'.format(args.resume))
+        state_dict = torch.load(args.resume)
+        model.load_state_dict(state_dict)
+
     if use_gpu:
         model.cuda()
-
-    model.train()
 
     initialize_data(args.data)  # extracts the zip files, makes a validation set
 
@@ -78,9 +83,14 @@ def train():
     correct = 0
     training_loss = 0
 
-    weights = torch.ones(numClasses)
-    # weights[0:12] = 2
-    # weights[12] = 0.5
+    w = []
+
+    for dirs in os.listdir(args.data + '/train_images'):
+        w.append(len(os.listdir(os.path.join(args.data + '/train_images', dirs))))
+
+    max_el = max(w)
+
+    weights = torch.tensor([max_el / el for el in w])
 
     if use_gpu:
         weights = weights.cuda()
@@ -91,6 +101,8 @@ def train():
     print("Begin training!")
     try:
         for epoch in range(num_epochs):
+
+            model.train()
 
             # Apply data transformations on the training images to augment dataset
             train_loader = torch.utils.data.DataLoader(
@@ -153,7 +165,7 @@ def validation(model, val_loader, scheduler, weights):
             if use_gpu:
                 images = images.cuda()
                 target = target.cuda()
-            output = model(images)
+            output = F.log_softmax(model(images), dim=1)
             validation_loss += F.nll_loss(output, target, size_average=False,
                                           weight=weights).data.item()  # sum up batch loss
             pred = output.data.max(1, keepdim=True)[1]  # get the index of the max log-probability

@@ -12,6 +12,9 @@ class ResnetGTSRB(nn.Module):
         self.resnet = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT)
         self.resnet.fc = nn.Linear(self.resnet.fc.in_features, numClasses)
 
+    def save_weights(self, path):
+        torch.save(self.state_dict(), path)
+
     def forward(self, x):
         x = self.resnet(x)
         return F.log_softmax(x, dim=1)
@@ -20,9 +23,6 @@ class ResnetGTSRB(nn.Module):
 class StnGTSRB(nn.Module):
     def __init__(self, numClasses):
         super(StnGTSRB, self).__init__()
-
-        # self.resnet = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT)
-        # self.resnet.fc = nn.Linear(self.resnet.fc.in_features, numClasses)
 
         # CNN layers
         self.conv1 = nn.Conv2d(3, 64, kernel_size=5)
@@ -60,9 +60,12 @@ class StnGTSRB(nn.Module):
         xs = xs.view(-1, 10 * 8 * 8)
         theta = self.fc_loc(xs)
         theta = theta.view(-1, 2, 3)
-        grid = F.affine_grid(theta, x.size())
-        x = F.grid_sample(x, grid)
+        grid = F.affine_grid(theta, x.size(), align_corners=False)
+        x = F.grid_sample(x, grid, align_corners=False)
         return x
+
+    def save_weights(self, path):
+        torch.save(self.state_dict(), path)
 
     def forward(self, x):
         # transform the input
@@ -77,3 +80,7 @@ class StnGTSRB(nn.Module):
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
         return F.log_softmax(x, dim=1)
+        # if self.training:
+        #     return F.log_softmax(x, dim=1)
+        # else:
+        #     return x

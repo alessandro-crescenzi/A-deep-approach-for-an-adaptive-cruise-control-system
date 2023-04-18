@@ -15,6 +15,7 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
+import torch.nn.functional as F
 import argparse
 import time
 import random
@@ -26,15 +27,19 @@ from collections import defaultdict
 from pathlib import Path
 from collections import OrderedDict
 from PIL import Image
-from GTSRB.data import data_transforms, data_jitter_hue, data_jitter_brightness, data_jitter_saturation, \
-    data_jitter_contrast, data_blur, data_rotate, data_center, data_affine, data_perspective  # data
 from GTSRB.model import ResnetGTSRB, StnGTSRB
 
 import matplotlib.pyplot as plt
 import cv2
 
-transforms = [data_transforms, data_jitter_hue, data_jitter_brightness, data_jitter_saturation,
-              data_jitter_contrast, data_blur, data_rotate, data_center, data_affine, data_perspective]
+# from GTSRB.data import data_transforms, data_jitter_hue, data_jitter_brightness, data_jitter_saturation, \
+#     data_jitter_contrast, data_blur, data_rotate, data_center, data_affine, data_perspective  # data
+# transforms = [data_transforms, data_jitter_hue, data_jitter_brightness, data_jitter_saturation,
+#               data_jitter_contrast, data_blur, data_rotate, data_center, data_affine, data_perspective]
+
+from GTSRB.utils.eval_transformation import *
+transforms = [basic_transformation, imadjust_transformation, histeq_transformation, adapthisteq_transformation,
+              conorm_transformation]
 
 
 def str2bool(v):
@@ -122,7 +127,7 @@ def parse_args(argv=None):
                         help='When displaying / saving video, draw the FPS on the frame')
     parser.add_argument('--emulate_playback', default=False, dest='emulate_playback', action='store_true',
                         help='When saving a video, emulate the framerate that you\'d get running in real-time mode.')
-    parser.add_argument('--use_gtsrb', default=False,
+    parser.add_argument('--gtsrb', default=None, type=str,
                         help='When display results for traffic sign, split speed limit traffic sign and unknown')
 
     parser.set_defaults(no_bar=False, display=False, resume=False, output_coco_json=False, output_web_json=False,
@@ -153,13 +158,12 @@ mapping = {
     3: "Speed Limit 60Kph",
     4: "Speed Limit 70Kph",
     5: "Speed Limit 80Kph",
-    6: "End Speed Limit 80Kph",
-    7: "Speed Limit 100Kph",
-    8: "Speed Limit 120Kph",
-    9: "Yield",
-    10: "Stop",
-    11: "End of Speed Limits",
-    12: "Unknown"
+    6: "Speed Limit 100Kph",
+    7: "Speed Limit 120Kph",
+    8: "Yield",
+    9: "Stop",
+    10: "End of Speed Limits",
+    11: "Unknown"
 }
 
 
@@ -173,7 +177,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
         img_gpu = torch.Tensor(img_numpy).cuda()
     else:
         img_gpu = img / 255.0
-        img = img / 255.0
+        # img = img / 255.0
         h, w, _ = img.shape
 
     with timer.env('Postprocess'):
@@ -284,7 +288,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 cv2.rectangle(img_numpy, (x1, y1), (x2, y2), color, 1)
 
             if args.display_text:
-                if args.use_gtsrb:
+                if args.gtsrb is not None:
                     _class = cfg.dataset.class_names[classes[j]]
                     if _class == 'traffic sign':
                         _h = y2 - y1
@@ -293,14 +297,13 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                             ts = img[y1:y2, x1:x2, :]
                             ts = ts.swapaxes(1, 2)
                             ts = ts.swapaxes(0, 1)
-                            _output = torch.zeros([1, 13], dtype=torch.float32)
+                            _output = torch.zeros(len(mapping.items()), dtype=torch.float32)
                             for i in range(0, len(transforms)):
                                 data = transforms[i](ts)
                                 data = data.unsqueeze(0)
                                 data = Variable(data)
-                                # data = data.cuda()
                                 _output = _output.add(gtsr_net(data))
-                            _output = gtsr_net(data)
+                            # _output = F.log_softmax(_output, dim=1)
                             pred = _output.data.max(1, keepdim=True)[1]
                             _class = mapping[pred.data.item()]
 
@@ -1178,16 +1181,22 @@ if __name__ == '__main__':
         net.eval()
 
         gtsr_net = None
-        if args.use_gtsrb:
-            gtsr_net = ResnetGTSRB(13)
-            state_dict = torch.load("GTSRB/weights/resnetGTSRB_39_5880.pth")
+        if args.gtsrb is not None:
+            if 'Resnet' in args.gtsrb:
+                gtsr_net = ResnetGTSRB(len(mapping.items()))
+            elif 'STN' in args.gtsrb:
+                gtsr_net = StnGTSRB(len(mapping.items()))
+            else:
+                print("gtsrb model name must contain STN or Resnet word")
+                exit(1)
+            state_dict = torch.load(args.gtsrb)
             gtsr_net.load_state_dict(state_dict)
             gtsr_net.eval()
         print(' Done.')
 
         if args.cuda:
             net = net.cuda()
-            if args.use_gtsrb:
+            if args.gtsrb is not None:
                 gtsr_net = gtsr_net.cuda()
 
         evaluate(net, dataset, gtsr_net)
