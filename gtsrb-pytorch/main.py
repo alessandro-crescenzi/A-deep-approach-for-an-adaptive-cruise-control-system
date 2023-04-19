@@ -72,7 +72,7 @@ def train():
 
     val_loader = torch.utils.data.DataLoader(
         datasets.ImageFolder(args.data + '/val_images',
-                             transform=basic_transformation),
+                             transform=data_transforms),
         batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=use_gpu)
 
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
@@ -84,10 +84,8 @@ def train():
     training_loss = 0
 
     w = []
-
     for dirs in os.listdir(args.data + '/train_images'):
         w.append(len(os.listdir(os.path.join(args.data + '/train_images', dirs))))
-
     max_el = max(w)
 
     weights = torch.tensor([max_el / el for el in w])
@@ -107,15 +105,27 @@ def train():
             # Apply data transformations on the training images to augment dataset
             train_loader = torch.utils.data.DataLoader(
                 torch.utils.data.ConcatDataset([datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=basic_transformation),
+                                                                     transform=data_transforms),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=imadjust_transformation),
+                                                                     transform=data_jitter_brightness),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=histeq_transformation),
+                                                                     transform=data_jitter_saturation),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=adapthisteq_transformation),
+                                                                     transform=data_jitter_contrast),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=conorm_transformation)
+                                                                     transform=data_jitter_contrast),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_blur),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_rotate),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_perspective),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_affine),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_center),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_erasing),
                                                 ]),
                 batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=use_gpu)
 
@@ -165,7 +175,7 @@ def validation(model, val_loader, scheduler, weights):
             if use_gpu:
                 images = images.cuda()
                 target = target.cuda()
-            output = F.log_softmax(model(images), dim=1)
+            output = model(images)
             validation_loss += F.nll_loss(output, target, size_average=False,
                                           weight=weights).data.item()  # sum up batch loss
             pred = output.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
