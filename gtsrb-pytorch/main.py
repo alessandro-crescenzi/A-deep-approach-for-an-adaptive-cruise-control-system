@@ -33,6 +33,8 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--save_folder', default='weights/',
                     help='Directory for saving checkpoint models.')
+parser.add_argument('--resume', default=None, type=str,
+                    help='Resuming training from here')
 args = parser.parse_args()
 
 torch.manual_seed(args.seed)
@@ -58,6 +60,11 @@ def train():
 
     model = StnGTSRB(numClasses)
 
+    if args.resume is not None:
+        print('Resuming training, loading {}...'.format(args.resume))
+        state_dict = torch.load(args.resume)
+        model.load_state_dict(state_dict)
+
     if use_gpu:
         model.cuda()
 
@@ -67,7 +74,7 @@ def train():
 
     val_loader = torch.utils.data.DataLoader(
         datasets.ImageFolder(args.data + '/val_images',
-                             transform=basic_transformation),
+                             transform=data_transforms),
         batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=use_gpu)
 
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
@@ -78,9 +85,12 @@ def train():
     correct = 0
     training_loss = 0
 
-    weights = torch.ones(numClasses)
-    # weights[0:12] = 2
-    # weights[12] = 0.5
+    w = []
+    for dirs in os.listdir(args.data + '/train_images'):
+        w.append(len(os.listdir(os.path.join(args.data + '/train_images', dirs))))
+    max_el = max(w)
+
+    weights = torch.tensor([max_el / el for el in w])
 
     if use_gpu:
         weights = weights.cuda()
@@ -95,15 +105,27 @@ def train():
             # Apply data transformations on the training images to augment dataset
             train_loader = torch.utils.data.DataLoader(
                 torch.utils.data.ConcatDataset([datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=basic_transformation),
+                                                                     transform=data_transforms),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=imadjust_transformation),
+                                                                     transform=data_jitter_brightness),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=histeq_transformation),
+                                                                     transform=data_jitter_saturation),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=adapthisteq_transformation),
+                                                                     transform=data_jitter_contrast),
                                                 datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=conorm_transformation)
+                                                                     transform=data_jitter_contrast),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_blur),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_rotate),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_perspective),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_affine),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_center),
+                                                datasets.ImageFolder(args.data + '/train_images',
+                                                                     transform=data_erasing),
                                                 ]),
                 batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=use_gpu)
 

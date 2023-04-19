@@ -53,6 +53,8 @@ def plot(file: str):
     plt.show()
     plt.savefig(f"../results/{file.split('.')[0]}_lossesPlot.png")
 
+    minima = [i for i, e in enumerate(j) if e == min(j)]
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
