@@ -58,6 +58,8 @@ def plot(file: str):
 
     print(f"Minimal index: {minima}")
 
+    minima = [i for i, e in enumerate(j) if e == min(j)]
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
