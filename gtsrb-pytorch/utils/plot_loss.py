@@ -3,6 +3,7 @@ import os
 import re
 
 import matplotlib.pyplot as plt
+import pandas as pd
 
 parser = argparse.ArgumentParser(description='PyTorch GTSRB plotting losses')
 parser.add_argument('--file', type=str, metavar='M',
@@ -54,6 +55,8 @@ def plot(file: str):
     # plt.savefig(f"../results/{file.split('.')[0]}_lossesPlot.png")
 
     minima = [i for i, e in enumerate(j) if e == min(j)]
+
+    print(f"Minimal index: {minima}")
 
 
 if __name__ == '__main__':

@@ -16,6 +16,7 @@ import torch
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 import torch.nn.functional as F
+from torchvision.utils import save_image
 import argparse
 import time
 import random
@@ -28,7 +29,7 @@ from pathlib import Path
 from collections import OrderedDict
 from PIL import Image
 from GTSRB.model import ResnetGTSRB, StnGTSRB
-
+import time
 import matplotlib.pyplot as plt
 import cv2
 
@@ -38,6 +39,7 @@ import cv2
 #               data_jitter_contrast, data_blur, data_rotate, data_center, data_affine, data_perspective]
 
 from GTSRB.utils.eval_transformation import *
+
 transforms = [basic_transformation, imadjust_transformation, histeq_transformation, adapthisteq_transformation,
               conorm_transformation]
 
@@ -167,7 +169,8 @@ mapping = {
 }
 
 
-def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str='',
+def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_color=False, mask_alpha=0.45,
+                 fps_str='',
                  path=''):
     """
     Note: If undo_transform=False then im_h and im_w are allowed to be None.
@@ -177,7 +180,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
         img_gpu = torch.Tensor(img_numpy).cuda()
     else:
         img_gpu = img / 255.0
-        # img = img / 255.0
+        img = img / 255.0
         h, w, _ = img.shape
 
     with timer.env('Postprocess'):
@@ -293,19 +296,29 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                     if _class == 'traffic sign':
                         _h = y2 - y1
                         _w = x2 - x1
-                        if (_w <= _h + _h / 2) and (_h <= _w + _w / 2):
-                            ts = img[y1:y2, x1:x2, :]
-                            ts = ts.swapaxes(1, 2)
-                            ts = ts.swapaxes(0, 1)
+                        if _w > 20 and _h > 20 and (_w <= _h + _h / 2) and (_h <= _w + _w / 2):
+                            ts = img[y1:y2, x1:x2, :].permute(2, 0, 1)
+                            ts = ts[(2, 1, 0), :, :].contiguous()
+                            # ts = img[y1:y2, x1:x2, :].permute(2, 0, 1)
                             _output = torch.zeros(len(mapping.items()), dtype=torch.float32)
-                            for i in range(0, len(transforms)):
-                                data = transforms[i](ts)
-                                data = data.unsqueeze(0)
-                                data = Variable(data)
-                                _output = _output.add(gtsr_net(data))
-                            # _output = F.log_softmax(_output, dim=1)
+                            # for i in range(0, len(transforms)):
+                            #     data = transforms[i](ts)
+                            #     data = data.unsqueeze(0)
+                            #     data = Variable(data)
+                            #     _output = _output.add(gtsr_net(data))
+                            data = basic_transformation(ts)
+                            data = data.unsqueeze(0)
+                            data = Variable(data)
+                            _output = gtsr_net(data)
                             pred = _output.data.max(1, keepdim=True)[1]
                             _class = mapping[pred.data.item()]
+
+                        # ts = img[y1:y2, x1:x2, :]
+                        # # ts = ts.swapaxes(1, 2)
+                        # # ts = ts.swapaxes(0, 1)
+                        # ts = ts.cpu().numpy()
+                        # # img = cv2.cvtColor(ts, cv2.COLOR_BGR2RGB)
+                        # cv2.imwrite(f"croppedTs/{j}{round(time.time())}.png", ts)
 
                     if _class == 'Unknown' or _class == 'traffic sign':
                         continue
@@ -672,7 +685,7 @@ def evalimage(net: Yolact, path: str, save_path: str = None, gtsr_net=None):
     batch = FastBaseTransform()(frame.unsqueeze(0))
     preds = net(batch)
 
-    img_numpy = prep_display(preds, frame, None, None, gtsr_net=gtsr_net,undo_transform=False, path=path)
+    img_numpy = prep_display(preds, frame, None, None, gtsr_net=gtsr_net, undo_transform=False, path=path)
 
     if save_path is None:
         img_numpy = img_numpy[:, :, (2, 1, 0)]
@@ -958,7 +971,7 @@ def evaluate(net: Yolact, dataset, gtsr_net=None, train_mode=False):
     if args.image is not None:
         if ':' in args.image:
             inp, out = args.image.split(':')
-            evalimage(net,inp, out, gtsr_net=gtsr_net)
+            evalimage(net, inp, out, gtsr_net=gtsr_net)
         else:
             evalimage(net, args.image, gtsr_net=gtsr_net)
         return
@@ -1190,7 +1203,7 @@ if __name__ == '__main__':
                 print("gtsrb model name must contain STN or Resnet word")
                 exit(1)
             state_dict = torch.load(args.gtsrb)
-            gtsr_net.load_state_dict(state_dict)
+            gtsr_net.load_state_dict(state_dict["model_state_dict"])
             gtsr_net.eval()
         print(' Done.')
 

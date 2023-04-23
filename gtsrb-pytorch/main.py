@@ -41,10 +41,8 @@ torch.manual_seed(args.seed)
 
 if torch.cuda.is_available():
     use_gpu = True
-    print("Using GPU")
 else:
     use_gpu = False
-    print("Using CPU")
 
 FloatTensor = torch.cuda.FloatTensor if use_gpu else torch.FloatTensor
 LongTensor = torch.cuda.LongTensor if use_gpu else torch.LongTensor
@@ -58,30 +56,39 @@ def train():
 
     numClasses = 12
 
-    model = StnGTSRB(numClasses)
-
-    if args.resume is not None:
-        print('Resuming training, loading {}...'.format(args.resume))
-        state_dict = torch.load(args.resume)
-        model.load_state_dict(state_dict)
-
-    if use_gpu:
-        model.cuda()
-
     initialize_data(args.data)  # extracts the zip files, makes a validation set
+
+    # Apply data transformations on the training images to augment dataset
+    train_loader = torch.utils.data.DataLoader(
+        torch.utils.data.ConcatDataset([datasets.ImageFolder(args.data + '/train_images',
+                                                             transform=data_transforms),
+                                        datasets.ImageFolder(args.data + '/train_images',
+                                                             transform=data_jitter_brightness),
+                                        datasets.ImageFolder(args.data + '/train_images',
+                                                             transform=data_jitter_saturation),
+                                        datasets.ImageFolder(args.data + '/train_images',
+                                                             transform=data_jitter_contrast),
+                                        datasets.ImageFolder(args.data + '/train_images',
+                                                             transform=data_jitter_contrast),
+                                        datasets.ImageFolder(args.data + '/train_images',
+                                                             transform=data_blur),
+                                        datasets.ImageFolder(args.data + '/train_images',
+                                                             transform=data_rotate),
+                                        datasets.ImageFolder(args.data + '/train_images',
+                                                             transform=data_perspective),
+                                        datasets.ImageFolder(args.data + '/train_images',
+                                                             transform=data_affine),
+                                        datasets.ImageFolder(args.data + '/train_images',
+                                                             transform=data_center),
+                                        datasets.ImageFolder(args.data + '/train_images',
+                                                             transform=data_erasing),
+                                        ]),
+        batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=use_gpu)
 
     val_loader = torch.utils.data.DataLoader(
         datasets.ImageFolder(args.data + '/val_images',
                              transform=data_transforms),
         batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=use_gpu)
-
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.5, verbose=True)
-
-    # loss counters
-    iteration = 0
-    correct = 0
-    training_loss = 0
 
     w = []
     for dirs in os.listdir(args.data + '/train_images'):
@@ -90,44 +97,39 @@ def train():
 
     weights = torch.tensor([max_el / el for el in w])
 
+    # weights = torch.ones(numClasses)
+
     if use_gpu:
         weights = weights.cuda()
 
-    num_epochs = args.epochs
+    model = StnGTSRB(numClasses)
+
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.5, verbose=True)
+
+    # loss counters
+    iteration = 0
+    correct = 0
+    training_loss = 0
     epoch = 0
+
+    if args.resume is not None:
+        print('Resuming training, loading {}...'.format(args.resume))
+        state_dict = torch.load(args.resume)
+        model.load_state_dict(state_dict['model_state_dict'])
+        optimizer.load_state_dict(state_dict['optimizer_state_dict'])
+        epoch = state_dict['epoch']
+
+    if use_gpu:
+        model.cuda()
+
+    num_epochs = args.epochs
 
     print("Begin training!")
     try:
         for epoch in range(num_epochs):
 
             model.train()
-
-            # Apply data transformations on the training images to augment dataset
-            train_loader = torch.utils.data.DataLoader(
-                torch.utils.data.ConcatDataset([datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_transforms),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_jitter_brightness),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_jitter_saturation),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_jitter_contrast),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_jitter_contrast),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_blur),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_rotate),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_perspective),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_affine),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_center),
-                                                datasets.ImageFolder(args.data + '/train_images',
-                                                                     transform=data_erasing),
-                                                ]),
-                batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=use_gpu)
 
             for batch_idx, (images, target) in enumerate(train_loader):
                 images, target = Variable(images), Variable(target)
@@ -156,12 +158,19 @@ def train():
             validation(model, val_loader, scheduler, weights)
 
             print("\nSaving weights:..")
-            model.save_weights(os.path.join(args.save_folder, f"gtsr_{epoch}_{iteration}.pth"))
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict()
+            }, os.path.join(args.save_folder, f"gtsr_{epoch}_{iteration}.pth"))
 
     except KeyboardInterrupt:
-        if args.interrupt:
-            print('Stopping early. Saving network...')
-            model.save_weights(os.path.join(args.save_folder, f"{epoch}_{iteration}_interrupt.pth"))
+        print('Stopping early. Saving network...')
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict()
+        }, os.path.join(args.save_folder, f"gtsr_{epoch}_{iteration}_interrupt.pth"))
         exit()
 
 
