@@ -18,6 +18,7 @@ REAL_TRUCK_WIDTH = 2.36
 REAL_TRUCK_HEIGHT = 3.20
 PIXEL_OFFSET = 3
 IMAGE_CENTER = 1024
+MAX_OFFSET = 100
 
 COLORS = ((244, 67, 54),
           (233, 30, 99),
@@ -102,6 +103,8 @@ def getGTimages():
                                 real_distance = element['3d']['center'][0] - element['3d']['dimensions'][0]/2
 
                     #Estimate distance
+                    if abs(IMAGE_CENTER-x_center) > MAX_OFFSET:
+                        continue
                     if is_car:
                         estimated_distance_height = fy * REAL_CAR_HEIGHT / (y2 - y1 - PIXEL_OFFSET)
                         estimated_distance_width = fx * REAL_CAR_WIDTH / (x2 - x1 - PIXEL_OFFSET)
