@@ -368,7 +368,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                             cv2.LINE_AA)
 
-        if args.display_text and abs(args.image_center - x_center) < MAX_OFFSET and real_height is not None:
+        if args.display_text and real_height is not None and abs(args.image_center - x_center) < MAX_OFFSET:
             # Estimate distance
             estimated_distance = args.focal_length * real_height / (y2_nearest - y1_nearest - PIXEL_OFFSET)
             text_str = '%.2f m' % estimated_distance
