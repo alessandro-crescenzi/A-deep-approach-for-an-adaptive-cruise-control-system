@@ -131,6 +131,12 @@ def parse_args(argv=None):
                         help='When saving a video, emulate the framerate that you\'d get running in real-time mode.')
     parser.add_argument('--gtsrb', default=None, type=str,
                         help='When display results for traffic sign, split speed limit traffic sign and unknown')
+    parser.add_argument('--distance', default=None, type=str,
+                        help='When display results for distance estimation from preceding vehicle')
+    parser.add_argument('--image_center', default=1024, type=int,
+                        help='Center of the image (or principal point) in pixel')
+    parser.add_argument('--focal_length', default=2265.30179, type=float,
+                        help='Focal length of the camera (fy) in pixel')
 
     parser.set_defaults(no_bar=False, display=False, resume=False, output_coco_json=False, output_web_json=False,
                         shuffle=False,
@@ -167,6 +173,11 @@ mapping = {
     10: "End of Speed Limits",
     11: "Unknown"
 }
+
+REAL_CAR_HEIGHT = 1.56
+REAL_TRUCK_HEIGHT = 3.20
+PIXEL_OFFSET = 3
+MAX_OFFSET = 400
 
 
 def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_color=False, mask_alpha=0.45,
@@ -282,6 +293,9 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
         return img_numpy
 
     if args.display_text or args.display_bboxes:
+        x_nearest_frontal_box = 999999
+        real_height = None
+
         for j in reversed(range(num_dets_to_consider)):
             x1, y1, x2, y2 = boxes[j, :]
             color = get_color(j)
@@ -291,8 +305,8 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 cv2.rectangle(img_numpy, (x1, y1), (x2, y2), color, 1)
 
             if args.display_text:
+                _class = cfg.dataset.class_names[classes[j]]
                 if args.gtsrb is not None:
-                    _class = cfg.dataset.class_names[classes[j]]
                     if _class == 'traffic sign':
                         _h = y2 - y1
                         _w = x2 - x1
@@ -322,8 +336,22 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
 
                     if _class == 'Unknown' or _class == 'traffic sign':
                         continue
-                else:
-                    _class = cfg.dataset.class_names[classes[j]]
+                elif args.distance is not None:
+                    if _class == 'car' or _class == 'truck':
+                        if _class == 'car':
+                            real_height = REAL_CAR_HEIGHT
+                        else:
+                            real_height = REAL_TRUCK_HEIGHT
+
+                        x_center = (x1 + x2) / 2
+
+                        if (abs(args.image_center - x_center) < abs(args.image_center - x_nearest_frontal_box)):
+                            x_nearest_frontal_box = x_center
+
+                            x1_nearest = x1
+                            x2_nearest = x2
+                            y1_nearest = y1
+                            y2_nearest = y2
 
                 text_str = '%s: %.2f' % (_class, score) if args.display_scores else _class
 
@@ -339,6 +367,23 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 cv2.rectangle(img_numpy, (x1, y1), (x1 + text_w, y1 - text_h - 4), color, -1)
                 cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                             cv2.LINE_AA)
+
+        if args.display_text and abs(args.image_center - x_center) < MAX_OFFSET and real_height is not None:
+            # Estimate distance
+            estimated_distance = args.focal_length * real_height / (y2_nearest - y1_nearest - PIXEL_OFFSET)
+            text_str = '%.2f m' % estimated_distance
+
+            font_face = cv2.FONT_HERSHEY_DUPLEX
+            font_scale = 1.2
+            font_thickness = 1
+
+            text_w, _ = cv2.getTextSize(text_str, font_face, font_scale, font_thickness)[0]
+
+            text_pt = (x1_nearest + round((x2_nearest-x1_nearest)/2 - text_w/2), y1_nearest + round((y2_nearest-y1_nearest)/2))
+            text_color = [255, 255, 255]
+
+            cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
+                        cv2.LINE_AA)
 
     return img_numpy
 

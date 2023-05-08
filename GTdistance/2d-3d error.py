@@ -18,7 +18,7 @@ REAL_TRUCK_WIDTH = 2.36
 REAL_TRUCK_HEIGHT = 3.20
 PIXEL_OFFSET = 3
 IMAGE_CENTER = 1024
-MAX_OFFSET = 100
+MAX_OFFSET = 400
 
 COLORS = ((244, 67, 54),
           (233, 30, 99),
@@ -104,6 +104,8 @@ def getGTimages():
 
                     #Estimate distance
                     if abs(IMAGE_CENTER-x_center) > MAX_OFFSET:
+                        res_filename = os.path.join(res_set, folder, f[0] + '_' + f[1] + '_' + f[2] + '_distanceGT.png')
+                        cv2.imwrite(res_filename, img)
                         continue
                     if is_car:
                         estimated_distance_height = fy * REAL_CAR_HEIGHT / (y2 - y1 - PIXEL_OFFSET)
