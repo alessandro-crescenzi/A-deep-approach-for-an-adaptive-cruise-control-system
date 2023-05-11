@@ -368,6 +368,17 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                             cv2.LINE_AA)
 
+        f_face = cv2.FONT_HERSHEY_DUPLEX
+        f_scale = h / 1000
+        f_thickness = 2 if h > 1000 else 1
+        speed_str = 'SPEED: 0 km/h'
+        speed_w, speed_h = cv2.getTextSize(speed_str, f_face, f_scale, f_thickness)[0]
+        speed_pt = (0, speed_h + int(h / 100))
+        speed_color = [255, 255, 255]
+        cv2.rectangle(img_numpy, (0, 0), (speed_w, speed_h + int(h / 100)*2), [0, 0, 0], -1)
+        cv2.putText(img_numpy, speed_str, speed_pt, f_face, f_scale, speed_color, f_thickness,
+                    cv2.LINE_AA)
+
         if args.display_text and real_height is not None and abs(args.image_center - x_center) < MAX_OFFSET:
             # Estimate distance
             estimated_distance = args.focal_length * real_height / (y2_nearest - y1_nearest - PIXEL_OFFSET)

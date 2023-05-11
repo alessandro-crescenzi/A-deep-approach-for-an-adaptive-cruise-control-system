@@ -8,11 +8,24 @@ import cv2
 parser = argparse.ArgumentParser(description='Camera Calibration')
 parser.add_argument('--video', type=str,
                     help='Video to modify')
+parser.add_argument('--offset', type=int,
+                    help='number of second to wait to print the new velocity info at the first frame. If offset > 0,'
+                         'the video in behind the first info velocity, otherwise the video is in adavance')
+
+
+def get_time(el):
+    h = int(el['timestamp'].split(' ')[1].split(':')[0])
+    m = int(el['timestamp'].split(' ')[1].split(':')[1])
+    s = int(el['timestamp'].split(' ')[1].split(':')[2])
+
+    return h * 10000 + m * 100 + s
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
 
     video_name = args.video
+    offset = args.offset
 
     if video_name is None:
         print("Insert video name")
@@ -64,18 +77,21 @@ if __name__ == '__main__':
         if not ret:
             break
 
+        text_str_prv = ''
+        el = video_info[max(0, int(i / fps) - offset)]
+
         try:
-            text_str = 'EGO VELOCITY: %d' % video_info[int(i / fps)]['velocity']
+            text_str = 'SPEED: %d km/h' % el['velocity']
             text_str_prv = text_str
         except IndexError:
             text_str = text_str_prv
 
         text_w, text_h = cv2.getTextSize(text_str, font_face, font_scale, font_thickness)[0]
 
-        text_pt = (x1, y1 + text_h + 3)
+        text_pt = (x1, y1 + text_h + 20)
         text_color = [255, 255, 255]
 
-        cv2.rectangle(frame, (x1, y1), (x1 + text_w, y1 + text_h + 4), [0, 0, 0], -1)
+        cv2.rectangle(frame, (x1, y1), (x1 + text_w, y1 + text_h + 40), [0, 0, 0], -1)
         cv2.putText(frame, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                     cv2.LINE_AA)
         out.write(frame)
