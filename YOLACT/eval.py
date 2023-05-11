@@ -1,3 +1,6 @@
+import math
+import re
+
 import torchvision.transforms
 
 from data import COCODetection, get_label_map, MEANS, COLORS
@@ -178,6 +181,9 @@ REAL_CAR_HEIGHT = 1.56
 REAL_TRUCK_HEIGHT = 3.20
 PIXEL_OFFSET = 3
 MAX_OFFSET = 400
+frame_index = 0
+speed_str_prv = ''
+ts_limit = 9999
 
 
 def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_color=False, mask_alpha=0.45,
@@ -368,17 +374,6 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                             cv2.LINE_AA)
 
-        f_face = cv2.FONT_HERSHEY_DUPLEX
-        f_scale = h / 1000
-        f_thickness = 2 if h > 1000 else 1
-        speed_str = 'SPEED: 0 km/h'
-        speed_w, speed_h = cv2.getTextSize(speed_str, f_face, f_scale, f_thickness)[0]
-        speed_pt = (0, speed_h + int(h / 100))
-        speed_color = [255, 255, 255]
-        cv2.rectangle(img_numpy, (0, 0), (speed_w, speed_h + int(h / 100)*2), [0, 0, 0], -1)
-        cv2.putText(img_numpy, speed_str, speed_pt, f_face, f_scale, speed_color, f_thickness,
-                    cv2.LINE_AA)
-
         if args.display_text and real_height is not None and abs(args.image_center - x_center) < MAX_OFFSET:
             # Estimate distance
             estimated_distance = args.focal_length * real_height / (y2_nearest - y1_nearest - PIXEL_OFFSET)
@@ -390,11 +385,37 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
 
             text_w, _ = cv2.getTextSize(text_str, font_face, font_scale, font_thickness)[0]
 
-            text_pt = (x1_nearest + round((x2_nearest-x1_nearest)/2 - text_w/2), y1_nearest + round((y2_nearest-y1_nearest)/2))
+            text_pt = (x1_nearest + round((x2_nearest - x1_nearest)/2 - text_w/2), y1_nearest + round((y2_nearest-y1_nearest)/2))
             text_color = [255, 255, 255]
 
             cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                         cv2.LINE_AA)
+
+        global frame_index
+        global speed_str_prv
+        speed_str_prv = ''
+        offset = 2
+        el = video_info[max(0, int(frame_index / 30) - offset)]
+
+        try:
+            speed_str = 'SPEED: %d km/h' % el['velocity']
+            speed_str_prv = speed_str
+        except IndexError:
+            speed_str = speed_str_prv
+        f_face = cv2.FONT_HERSHEY_DUPLEX
+        f_scale = h / 1000
+        f_thickness = 2 if h > 1000 else 1
+        speed_w, speed_h = cv2.getTextSize(speed_str, f_face, f_scale, f_thickness)[0]
+        speed_pt = (0, speed_h + int(h / 100))
+        speed_color = [255, 255, 255]
+        speed_bg = [0, 255, 0]
+        if real_height is not None:
+            if el['velocity'] > 10*math.sqrt(estimated_distance):
+                speed_bg = [255, 0, 0]
+        cv2.rectangle(img_numpy, (0, 0), (speed_w, speed_h + int(h / 100) * 2), speed_bg, -1)
+        cv2.putText(img_numpy, speed_str, speed_pt, f_face, f_scale, speed_color, f_thickness,
+                    cv2.LINE_AA)
+        frame_index += 1
 
     return img_numpy
 
@@ -1036,10 +1057,17 @@ def evaluate(net: Yolact, dataset, gtsr_net=None, train_mode=False):
         evalimages(net, inp, out, gtsr_net=gtsr_net)
         return
     elif args.video is not None:
+        with open('GPSData.json') as json_file:
+            data = json.load(json_file)
+        global video_info
         if ':' in args.video:
             inp, out = args.video.split(':')
+            name = re.search(r'NO(?P<time>\S+)', inp).groupdict()['time']
+            video_info = data[name]
             evalvideo(net, inp, out)
         else:
+            name = re.search(r'NO(?P<time>\S+)', args.video).groupdict()['time']
+            video_info = data[name]
             evalvideo(net, args.video)
         return
 
