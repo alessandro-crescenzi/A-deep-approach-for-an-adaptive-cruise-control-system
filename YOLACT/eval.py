@@ -122,7 +122,7 @@ def parse_args(argv=None):
                         help='A path to a video to evaluate on. Passing in a number will use that index webcam.')
     parser.add_argument('--video_multiframe', default=1, type=int,
                         help='The number of frames to evaluate in parallel to make videos play at higher fps.')
-    parser.add_argument('--score_threshold', default=0, type=float,
+    parser.add_argument('--score_threshold', default=0.20, type=float,
                         help='Detections with a score under this threshold will not be considered. This currently only works in display mode.')
     parser.add_argument('--dataset', default=None, type=str,
                         help='If specified, override the dataset specified in the config with this one (example: coco2017_dataset).')
@@ -179,11 +179,15 @@ mapping = {
 
 REAL_CAR_HEIGHT = 1.56
 REAL_TRUCK_HEIGHT = 3.20
+REAL_TRAFFIC_SIGN_HEIGHT = 0.6
 PIXEL_OFFSET = 3
 MAX_OFFSET = 400
+NUM_FRAME_ACTIVATION = 8
 frame_index = 0
 speed_str_prv = ''
 ts_limit = 9999
+num_detection = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+activated_ts = []
 
 
 def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_color=False, mask_alpha=0.45,
@@ -298,6 +302,19 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
     if num_dets_to_consider == 0:
         return img_numpy
 
+    global num_detection
+    global frame_index
+    global speed_str_prv
+    global activated_ts
+    global ts_limit
+
+    if frame_index%10 == 0:
+        activated_ts = []
+        for i in range(len(num_detection)):
+            if num_detection[i] >= NUM_FRAME_ACTIVATION:
+                num_detection[i]=0
+                activated_ts.append(i)
+
     if args.display_text or args.display_bboxes:
         x_nearest_frontal_box = 999999
         real_height = None
@@ -312,6 +329,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
 
             if args.display_text:
                 _class = cfg.dataset.class_names[classes[j]]
+                label = _class
                 if args.gtsrb is not None:
                     if _class == 'traffic sign':
                         _h = y2 - y1
@@ -332,6 +350,8 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                             _output = gtsr_net(data)
                             pred = _output.data.max(1, keepdim=True)[1]
                             _class = mapping[pred.data.item()]
+
+                            num_detection[pred] += 1
 
                         # ts = img[y1:y2, x1:x2, :]
                         # # ts = ts.swapaxes(1, 2)
@@ -359,6 +379,9 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                             y1_nearest = y1
                             y2_nearest = y2
 
+                if label == 'traffic sign' and pred is not None and pred not in activated_ts:
+                    continue
+
                 text_str = '%s: %.2f' % (_class, score) if args.display_scores else _class
 
                 font_face = cv2.FONT_HERSHEY_DUPLEX
@@ -373,6 +396,19 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 cv2.rectangle(img_numpy, (x1, y1), (x1 + text_w, y1 - text_h - 4), color, -1)
                 cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                             cv2.LINE_AA)
+
+                if label == 'traffic sign' and (_class == list(mapping.values()).index("Stop") or _class == list(mapping.values()).index("Yield")) :
+                    estimated_distance = args.focal_length * REAL_TRAFFIC_SIGN_HEIGHT / (_h - PIXEL_OFFSET)
+
+                    text_str = 'Distance to %s: %.2f m' % (_class, estimated_distance)
+
+                    text_pt = (0, h - 3)
+                    text_color = [255, 255, 255]
+                    text_w, text_h = cv2.getTextSize(text_str, font_face, font_scale, font_thickness)[0]
+
+                    cv2.rectangle(img_numpy, (0, h), (text_w, h - text_h - 6), [0, 0, 0], -1)
+                    cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
+                                cv2.LINE_AA)
 
         if args.display_text and real_height is not None and abs(args.image_center - x_center) < MAX_OFFSET:
             # Estimate distance
