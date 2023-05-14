@@ -1323,7 +1323,7 @@ if __name__ == '__main__':
                 print("gtsrb model name must contain STN or Resnet word")
                 exit(1)
             state_dict = torch.load(args.gtsrb)
-            gtsr_net.load_state_dict(state_dict)
+            gtsr_net.load_state_dict(state_dict['model_state_dict'])
             gtsr_net.eval()
         print(' Done.')
 
