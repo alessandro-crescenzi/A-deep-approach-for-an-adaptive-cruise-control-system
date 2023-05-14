@@ -120,7 +120,7 @@ def parse_args(argv=None):
                         help='An input folder of images and output folder to save detected images. Should be in the format input->output.')
     parser.add_argument('--video', default=None, type=str,
                         help='A path to a video to evaluate on. Passing in a number will use that index webcam.')
-    parser.add_argument('--video_multiframe', default=1, type=int,
+    parser.add_argument('--video_multiframe', default=4, type=int,
                         help='The number of frames to evaluate in parallel to make videos play at higher fps.')
     parser.add_argument('--score_threshold', default=0.20, type=float,
                         help='Detections with a score under this threshold will not be considered. This currently only works in display mode.')
@@ -182,12 +182,13 @@ REAL_TRUCK_HEIGHT = 3.20
 REAL_TRAFFIC_SIGN_HEIGHT = 0.6
 PIXEL_OFFSET = 3
 MAX_OFFSET = 400
-NUM_FRAME_ACTIVATION = 8
+NUM_FRAME_ACTIVATION = 2
 frame_index = 0
 speed_str_prv = ''
 ts_limit = 9999
 num_detection = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 activated_ts = []
+#gtsr_net=None
 
 
 def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_color=False, mask_alpha=0.45,
@@ -427,31 +428,30 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
             cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                         cv2.LINE_AA)
 
-        global frame_index
-        global speed_str_prv
-        speed_str_prv = ''
-        offset = 2
-        el = video_info[max(0, int(frame_index / 30) - offset)]
+        if args.video is not None:
+            speed_str_prv = ''
+            offset = 2
+            el = video_info[max(0, int(frame_index / 30) - offset)]
 
-        try:
-            speed_str = 'SPEED: %d km/h' % el['velocity']
-            speed_str_prv = speed_str
-        except IndexError:
-            speed_str = speed_str_prv
-        f_face = cv2.FONT_HERSHEY_DUPLEX
-        f_scale = h / 1000
-        f_thickness = 2 if h > 1000 else 1
-        speed_w, speed_h = cv2.getTextSize(speed_str, f_face, f_scale, f_thickness)[0]
-        speed_pt = (0, speed_h + int(h / 100))
-        speed_color = [255, 255, 255]
-        speed_bg = [0, 255, 0]
-        if real_height is not None:
-            if el['velocity'] > 10*math.sqrt(estimated_distance):
-                speed_bg = [255, 0, 0]
-        cv2.rectangle(img_numpy, (0, 0), (speed_w, speed_h + int(h / 100) * 2), speed_bg, -1)
-        cv2.putText(img_numpy, speed_str, speed_pt, f_face, f_scale, speed_color, f_thickness,
-                    cv2.LINE_AA)
-        frame_index += 1
+            try:
+                speed_str = 'SPEED: %d km/h' % el['velocity']
+                speed_str_prv = speed_str
+            except IndexError:
+                speed_str = speed_str_prv
+            f_face = cv2.FONT_HERSHEY_DUPLEX
+            f_scale = h / 1000
+            f_thickness = 2 if h > 1000 else 1
+            speed_w, speed_h = cv2.getTextSize(speed_str, f_face, f_scale, f_thickness)[0]
+            speed_pt = (0, speed_h + int(h / 100))
+            speed_color = [255, 255, 255]
+            speed_bg = [0, 255, 0]
+            if real_height is not None:
+                if el['velocity'] > 10*math.sqrt(estimated_distance):
+                    speed_bg = [255, 0, 0]
+            cv2.rectangle(img_numpy, (0, 0), (speed_w, speed_h + int(h / 100) * 2), speed_bg, -1)
+            cv2.putText(img_numpy, speed_str, speed_pt, f_face, f_scale, speed_color, f_thickness,
+                        cv2.LINE_AA)
+            frame_index += 1
 
     return img_numpy
 
@@ -839,7 +839,7 @@ class CustomDataParallel(torch.nn.DataParallel):
         return sum(outputs, [])
 
 
-def evalvideo(net: Yolact, path: str, out_path: str = None):
+def evalvideo(net: Yolact, path: str, out_path: str = None, gtsr_net=None):
     # If the path is a digit, parse it as a webcam index
     is_webcam = path.isdigit()
 
@@ -915,7 +915,7 @@ def evalvideo(net: Yolact, path: str, out_path: str = None):
     def prep_frame(inp, fps_str):
         with torch.no_grad():
             frame, preds = inp
-            return prep_display(preds, frame, None, None, undo_transform=False, class_color=True, fps_str=fps_str)
+            return prep_display(preds, frame, None, None, gtsr_net=gtsr_net, undo_transform=False, class_color=True, fps_str=fps_str)
 
     frame_buffer = Queue()
     video_fps = 0
@@ -1100,11 +1100,11 @@ def evaluate(net: Yolact, dataset, gtsr_net=None, train_mode=False):
             inp, out = args.video.split(':')
             name = re.search(r'NO(?P<time>\S+)', inp).groupdict()['time']
             video_info = data[name]
-            evalvideo(net, inp, out)
+            evalvideo(net, inp, out, gtsr_net=gtsr_net)
         else:
             name = re.search(r'NO(?P<time>\S+)', args.video).groupdict()['time']
             video_info = data[name]
-            evalvideo(net, args.video)
+            evalvideo(net, args.video, gtsr_net=gtsr_net)
         return
 
     frame_times = MovingAverage()
@@ -1323,7 +1323,7 @@ if __name__ == '__main__':
                 print("gtsrb model name must contain STN or Resnet word")
                 exit(1)
             state_dict = torch.load(args.gtsrb)
-            gtsr_net.load_state_dict(state_dict["model_state_dict"])
+            gtsr_net.load_state_dict(state_dict)
             gtsr_net.eval()
         print(' Done.')
 

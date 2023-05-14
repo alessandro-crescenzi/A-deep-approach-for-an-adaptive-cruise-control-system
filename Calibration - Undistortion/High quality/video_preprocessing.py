@@ -8,6 +8,7 @@ import numpy as np
 import argparse
 from tqdm import tqdm
 import glob
+from frr import FastReflectionRemoval
 
 
 parser = argparse.ArgumentParser(description='Camera Calibration')
@@ -78,19 +79,36 @@ def video_undistortion(video_name: str, dir: str, resize_perc: int):
         # frame = cv2.resize(frame, frameSize)
         # dst = cv2.undistort(frame, cameraMatrix, dist, None, newCameraMatrix)
         dst = cv2.remap(frame, mapx, mapy, cv2.INTER_LINEAR)
-        # Preprocessing
-        gray = cv2.cvtColor(dst, cv2.COLOR_BGR2GRAY)
-        # Create the mask for the inpainting
-        mask = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)[1]
-        # Gaussian filtering
-        blur = cv2.GaussianBlur(dst, (5, 5), 0)
-        adjusted = cv2.inpaint(blur, mask, 1, cv2.INPAINT_TELEA)
+        # # Preprocessing
+        # gray = cv2.cvtColor(dst, cv2.COLOR_BGR2GRAY)
+        # # Create the mask for the inpainting
+        # mask = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)[1]
+        # # Gaussian filtering
+        # blur = cv2.GaussianBlur(dst, (5, 5), 0)
+        # adjusted = cv2.inpaint(blur, mask, 1, cv2.INPAINT_TELEA)
+        # # Contrast control (1.0-3.0)
+        # alpha = 1.5
+        # # Brightness control (0-100)
+        # beta = 0
+        #
+        # dst = cv2.convertScaleAbs(adjusted, alpha=alpha, beta=beta)
+        # if resize_perc != 100:
+        #     dst = cv2.resize(dst, frameSize)
+        # out.write(dst)
+        # Instantiate the algorithm
+        alg = FastReflectionRemoval(h=0.11)
+        dst = dst / 255
+        rem_glare = alg.remove_reflection(dst)
+        rem_glare = rem_glare * 255
+        # Gaussian filter
+        blur = cv2.GaussianBlur(rem_glare, (5, 5), 0)
         # Contrast control (1.0-3.0)
         alpha = 1.5
         # Brightness control (0-100)
         beta = 0
 
-        dst = cv2.convertScaleAbs(adjusted, alpha=alpha, beta=beta)
+        dst = cv2.convertScaleAbs(blur, alpha=alpha, beta=beta)
+
         if resize_perc != 100:
             dst = cv2.resize(dst, frameSize)
         out.write(dst)

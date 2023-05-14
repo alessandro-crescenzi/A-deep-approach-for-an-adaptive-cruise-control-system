@@ -7,7 +7,7 @@ from GTSRB.utils.preprocessing import *
 
 basic_transformation = transforms.Compose([
     transforms.Resize((48, 48)),
-    transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739))
+    # transforms.Normalize((0.3332, 0.3019, 0.3060), (0.2827, 0.2710, 0.2739))
 ])
 
 imadjust_transformation = transforms.Compose([
