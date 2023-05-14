@@ -8,6 +8,7 @@ import numpy as np
 import argparse
 from tqdm import tqdm
 import glob
+from frr import FastReflectionRemoval
 
 
 parser = argparse.ArgumentParser(description='Camera Calibration')
@@ -78,6 +79,20 @@ def video_undistortion(video_name: str, dir: str, resize_perc: int):
         # frame = cv2.resize(frame, frameSize)
         # dst = cv2.undistort(frame, cameraMatrix, dist, None, newCameraMatrix)
         dst = cv2.remap(frame, mapx, mapy, cv2.INTER_LINEAR)
+        # Instantiate the algorithm
+        alg = FastReflectionRemoval(h=0.11)
+        dst = dst / 255
+        rem_glare = alg.remove_reflection(dst)
+        rem_glare = rem_glare * 255
+        # Gaussian filter
+        blur = cv2.GaussianBlur(rem_glare, (5, 5), 0)
+        # Contrast control (1.0-3.0)
+        alpha = 1.5
+        # Brightness control (0-100)
+        beta = 0
+
+        dst = cv2.convertScaleAbs(blur, alpha=alpha, beta=beta)
+
         if resize_perc != 100:
             dst = cv2.resize(dst, frameSize)
         out.write(dst)
