@@ -182,7 +182,9 @@ REAL_TRUCK_HEIGHT = 3.20
 REAL_TRAFFIC_SIGN_HEIGHT = 0.6
 PIXEL_OFFSET = 3
 MAX_OFFSET = 400
-NUM_FRAME_ACTIVATION = 2
+NUM_FRAME_WINDOW = 5
+NUM_FRAME_ACTIVATION = 4
+NUM_FRAME_VALID_TS = 10*30
 frame_index = 0
 speed_str_prv = ''
 ts_limit = 9999
@@ -309,12 +311,14 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
     global activated_ts
     global ts_limit
 
-    if frame_index%10 == 0:
-        activated_ts = []
-        for i in range(len(num_detection)):
-            if num_detection[i] >= NUM_FRAME_ACTIVATION:
-                num_detection[i]=0
-                activated_ts.append(i)
+    if frame_index%NUM_FRAME_WINDOW == 0:
+      for i in range(len(activated_ts) - 1, -1, -1):
+          if abs ((frame_index - activated_ts[i][1]) > NUM_FRAME_VALID_TS):
+              del activated_ts[i]
+      for i in range(len(num_detection)):
+          if num_detection[i] >= NUM_FRAME_ACTIVATION:
+              activated_ts.append((i, frame_index))
+          num_detection[i]=0
 
     if args.display_text or args.display_bboxes:
         x_nearest_frontal_box = 999999
@@ -380,7 +384,12 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                             y1_nearest = y1
                             y2_nearest = y2
 
-                if label == 'traffic sign' and pred is not None and pred not in activated_ts:
+                if label == 'traffic sign' and pred is not None:
+                  present = False
+                  for i in range (len(activated_ts)):
+                    if pred == activated_ts[i][0]:
+                      present = True
+                  if not present:
                     continue
 
                 text_str = '%s: %.2f' % (_class, score) if args.display_scores else _class
@@ -1093,7 +1102,7 @@ def evaluate(net: Yolact, dataset, gtsr_net=None, train_mode=False):
         evalimages(net, inp, out, gtsr_net=gtsr_net)
         return
     elif args.video is not None:
-        with open('GPSData.json') as json_file:
+        with open('/content/drive/MyDrive/computer_vision_project/YOLACT/GPSData.json') as json_file:
             data = json.load(json_file)
         global video_info
         if ':' in args.video:
