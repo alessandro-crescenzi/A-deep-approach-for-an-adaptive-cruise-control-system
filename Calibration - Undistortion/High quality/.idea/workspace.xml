@@ -2,7 +2,15 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="63d4c7d7-04a5-49a2-bd66-bf4a922ca1f8" name="Changes" comment="files managing">
-      <change afterPath="$PROJECT_DIR$/video_preprocessing.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/High quality.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/High quality.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/calibrated_videos/prova.MP4" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/video_preprocessing.py" beforeDir="false" afterPath="$PROJECT_DIR$/video_preprocessing.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/video_undistortion.py" beforeDir="false" afterPath="$PROJECT_DIR$/video_undistortion.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Low quality/.idea/Low quality.iml" beforeDir="false" afterPath="$PROJECT_DIR$/../Low quality/.idea/Low quality.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Low quality/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../Low quality/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Low quality/video_undistortion.py" beforeDir="false" afterPath="$PROJECT_DIR$/../Low quality/video_undistortion.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -48,12 +56,17 @@
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/calibration.py" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="node.js.detected.package.eslint" value="true" />
     <property name="node.js.selected.package.eslint" value="(autodetect)" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
-  <component name="RunManager" selected="Python.video_undistortion">
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\Universita\Universita\Magistrale\Progetti Universita\Git repositories\computer_vision_project\Calibration - Undistortion\High quality" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Python.video_preprocessing">
     <configuration name="calibration" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
       <module name="High quality" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -120,6 +133,28 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="video_preprocessing" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+      <module name="High quality" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/video_preprocessing.py" />
+      <option name="PARAMETERS" value="--video=NO20220625-153822-000126.MP4 --resize=50" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="video_undistortion" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="High quality" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -145,6 +180,7 @@
     <list>
       <item itemvalue="Python.calibration" />
       <item itemvalue="Python.frame_extraction" />
+      <item itemvalue="Python.video_preprocessing" />
       <item itemvalue="Python.calibrazione_video" />
       <item itemvalue="Python.video_undistortion" />
     </list>
@@ -177,6 +213,14 @@
       <workItem from="1682930430306" duration="52000" />
       <workItem from="1683036226785" duration="959000" />
       <workItem from="1683039692196" duration="308000" />
+      <workItem from="1684060611539" duration="11352000" />
+      <workItem from="1684157086389" duration="10674000" />
+      <workItem from="1684255083254" duration="7362000" />
+      <workItem from="1684568460847" duration="4254000" />
+      <workItem from="1684575117254" duration="1952000" />
+      <workItem from="1684655050835" duration="63000" />
+      <workItem from="1684677565917" duration="4721000" />
+      <workItem from="1684739307933" duration="2465000" />
     </task>
     <task id="LOCAL-00001" summary="files managing">
       <created>1682930472340</created>
@@ -223,8 +267,13 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/video_undistortion.py</url>
-          <line>72</line>
-          <option name="timeStamp" value="2" />
+          <line>103</line>
+          <option name="timeStamp" value="10" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/video_undistortion.py</url>
+          <line>98</line>
+          <option name="timeStamp" value="12" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
@@ -233,7 +282,8 @@
     <SUITE FILE_PATH="coverage/Prova_calibrazione_dashcam$calibration.coverage" NAME="calibration Coverage Results" MODIFIED="1663956847270" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/High_quality$calibration.coverage" NAME="calibration Coverage Results" MODIFIED="1665472492999" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/High_quality$frame_extraction.coverage" NAME="frame_extraction Coverage Results" MODIFIED="1679074339121" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/calibrated_videos" />
-    <SUITE FILE_PATH="coverage/High_quality$video_undistortion.coverage" NAME="video_undistortion Coverage Results" MODIFIED="1682929018052" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/High_quality$video_undistortion.coverage" NAME="video_undistortion Coverage Results" MODIFIED="1684262123499" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Prova_calibrazione_dashcam$calibrazione_video.coverage" NAME="calibrazione_video Coverage Results" MODIFIED="1664094529284" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/High_quality$video_preprocessing.coverage" NAME="video_preprocessing Coverage Results" MODIFIED="1684739478826" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

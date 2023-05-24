@@ -8,13 +8,15 @@ import numpy as np
 import argparse
 from tqdm import tqdm
 import glob
-from frr import FastReflectionRemoval
+from frr.core import FastReflectionRemoval
+import matplotlib.pyplot as plt
 
 
 parser = argparse.ArgumentParser(description='Camera Calibration')
 parser.add_argument('--resize', default=100, type=int,
                     help='Percentage of the original image')
-parser.add_argument('--video', nargs='+', help="Video filename to calibrate")
+parser.add_argument('--video', type=str,
+                    help="Video filename to calibrate")
 parser.add_argument('--video_extension', default="mp4", help="Video filename extension to calibrate")
 parser.add_argument('--input_dir', help="Input directory")
 
@@ -66,6 +68,10 @@ def video_undistortion(video_name: str, dir: str, resize_perc: int):
 
     mapx, mapy = cv2.initUndistortRectifyMap(cameraMatrix, dist, None, newCameraMatrix, (width, height), 5)
 
+    N, M = frameSize
+
+    alg = FastReflectionRemoval(h=0.03, M=M, N=N)
+
     # Start time
     start = time.time()
 
@@ -74,43 +80,26 @@ def video_undistortion(video_name: str, dir: str, resize_perc: int):
         ret, frame = video.read()
         if not ret:
             break
-        # print(f"Return value:   {ret}"
-        # frameSize = (640, 480)
-        # frame = cv2.resize(frame, frameSize)
-        # dst = cv2.undistort(frame, cameraMatrix, dist, None, newCameraMatrix)
-        dst = cv2.remap(frame, mapx, mapy, cv2.INTER_LINEAR)
-        # # Preprocessing
-        # gray = cv2.cvtColor(dst, cv2.COLOR_BGR2GRAY)
-        # # Create the mask for the inpainting
-        # mask = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)[1]
-        # # Gaussian filtering
-        # blur = cv2.GaussianBlur(dst, (5, 5), 0)
-        # adjusted = cv2.inpaint(blur, mask, 1, cv2.INPAINT_TELEA)
-        # # Contrast control (1.0-3.0)
-        # alpha = 1.5
-        # # Brightness control (0-100)
-        # beta = 0
-        #
-        # dst = cv2.convertScaleAbs(adjusted, alpha=alpha, beta=beta)
-        # if resize_perc != 100:
-        #     dst = cv2.resize(dst, frameSize)
-        # out.write(dst)
-        # Instantiate the algorithm
-        alg = FastReflectionRemoval(h=0.11)
-        dst = dst / 255
-        rem_glare = alg.remove_reflection(dst)
-        rem_glare = rem_glare * 255
-        # Gaussian filter
-        blur = cv2.GaussianBlur(rem_glare, (5, 5), 0)
-        # Contrast control (1.0-3.0)
-        alpha = 1.5
-        # Brightness control (0-100)
-        beta = 0
 
-        dst = cv2.convertScaleAbs(blur, alpha=alpha, beta=beta)
+        dst = cv2.remap(frame, mapx, mapy, cv2.INTER_LINEAR)
 
         if resize_perc != 100:
             dst = cv2.resize(dst, frameSize)
+
+        # FRR algorithm
+        dst = dst / 255
+        dst = alg.remove_reflection(dst)
+        dst = dst * 255
+        # Gaussian filter
+        dst = cv2.GaussianBlur(dst, (7, 7), 0)
+        # # Contrast control (1.0-3.0)
+        alpha = 1
+        # Brightness control (0-100)
+        beta = 0
+        dst = cv2.convertScaleAbs(dst, alpha=alpha, beta=beta)
+
+        # dst = cv2.GaussianBlur(dst, (5, 5), 0)
+
         out.write(dst)
 
     # End time
@@ -134,23 +123,9 @@ if __name__ == '__main__':
     video_ext = args.video_extension
     name = args.video
     resize_percentage = args.resize
-    inp_dir = args.input_dir
     out_dir = "calibrated_videos"
-    videos = []
 
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
     if name is not None:
-        videos = np.asarray(name).tolist()
-    else:
-        videos += glob.glob('*.' + video_ext)
-
-    for vid in videos:
-        video_undistortion(vid, out_dir, resize_percentage)
-
-    videos = []
-
-    if inp_dir is not None:
-        videos = glob.glob(inp_dir+'/*.'+video_ext)
-    for vid in videos:
-        video_undistortion(inp_dir+'/'+vid, out_dir, resize_percentage)
+        video_undistortion(name, out_dir, resize_percentage)
