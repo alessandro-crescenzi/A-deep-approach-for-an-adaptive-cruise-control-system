@@ -140,6 +140,7 @@ def parse_args(argv=None):
                         help='Center of the image (or principal point) in pixel')
     parser.add_argument('--focal_length', default=2265.30179, type=float,
                         help='Focal length of the camera (fy) in pixel')
+    #366.03
 
     parser.set_defaults(no_bar=False, display=False, resume=False, output_coco_json=False, output_web_json=False,
                         shuffle=False,
@@ -323,6 +324,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
     if args.display_text or args.display_bboxes:
         x_nearest_frontal_box = 999999
         real_height = None
+        estimated_distance = None
 
         for j in reversed(range(num_dets_to_consider)):
             x1, y1, x2, y2 = boxes[j, :]
@@ -356,6 +358,25 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                             pred = _output.data.max(1, keepdim=True)[1]
                             _class = mapping[pred.data.item()]
 
+                            if  _class == 'Speed Limit 20Kph':
+                                ts_limit = 20
+                            elif _class == 'Speed Limit 30Kph':
+                                ts_limit = 30
+                            elif _class == 'Speed Limit 50Kph':
+                                ts_limit = 50
+                            elif _class == 'Speed Limit 60Kph':
+                                ts_limit = 60
+                            elif _class == 'Speed Limit 70Kph':
+                                ts_limit = 70
+                            elif _class == 'Speed Limit 80Kph':
+                                ts_limit = 80
+                            elif _class == 'Speed Limit 100Kph':
+                                ts_limit = 100
+                            elif _class == 'Speed Limit 120Kph':
+                                ts_limit = 120
+                            elif _class == 'End of Speed Limits':
+                                ts_limit = 9999
+
                             num_detection[pred] += 1
 
                         # ts = img[y1:y2, x1:x2, :]
@@ -367,7 +388,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
 
                     if _class == 'Unknown' or _class == 'traffic sign':
                         continue
-                elif args.distance is not None:
+                if args.distance is not None:
                     if _class == 'car' or _class == 'truck':
                         if _class == 'car':
                             real_height = REAL_CAR_HEIGHT
@@ -387,8 +408,11 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 if label == 'traffic sign' and pred is not None:
                   present = False
                   for i in range (len(activated_ts)):
-                    if pred == activated_ts[i][0]:
-                      present = True
+                      try:
+                          if pred == activated_ts[i][0]:
+                              present = True
+                      except:
+                          ...
                   if not present:
                     continue
 
@@ -407,10 +431,11 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                             cv2.LINE_AA)
 
-                if label == 'traffic sign' and (_class == list(mapping.values()).index("Stop") or _class == list(mapping.values()).index("Yield")) :
-                    estimated_distance = args.focal_length * REAL_TRAFFIC_SIGN_HEIGHT / (_h - PIXEL_OFFSET)
+                #list(mapping.values()).index("Yield")
+                if label == 'traffic sign' and (_class == "Stop" or _class == "Yield") :
+                    estimated_distance_ts = args.focal_length * REAL_TRAFFIC_SIGN_HEIGHT / (_h)
 
-                    text_str = 'Distance to %s: %.2f m' % (_class, estimated_distance)
+                    text_str = 'Distance to %s: %.2f m' % (_class, estimated_distance_ts)
 
                     text_pt = (0, h - 3)
                     text_color = [255, 255, 255]
@@ -423,43 +448,65 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
         if args.display_text and real_height is not None and abs(args.image_center - x_center) < MAX_OFFSET:
             # Estimate distance
             estimated_distance = args.focal_length * real_height / (y2_nearest - y1_nearest - PIXEL_OFFSET)
-            text_str = '%.2f m' % estimated_distance
 
+            '''
             font_face = cv2.FONT_HERSHEY_DUPLEX
             font_scale = 1.2
             font_thickness = 1
 
             text_w, _ = cv2.getTextSize(text_str, font_face, font_scale, font_thickness)[0]
 
-            text_pt = (x1_nearest + round((x2_nearest - x1_nearest)/2 - text_w/2), y1_nearest + round((y2_nearest-y1_nearest)/2))
+            text_pt = (x1_nearest + round((x2_nearest - x1_nearest) / 2 - text_w / 2),
+                       y1_nearest + round((y2_nearest - y1_nearest) / 2))
             text_color = [255, 255, 255]
 
             cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                         cv2.LINE_AA)
+                        
+            '''
 
         if args.video is not None:
             speed_str_prv = ''
             offset = 2
-            el = video_info[max(0, int(frame_index / 30) - offset)]
+            actual_speed = None
 
             try:
-                speed_str = 'SPEED: %d km/h' % el['velocity']
+                el = video_info[max(0, int(frame_index / 30) - offset)]
+                actual_speed = el['velocity']
+                speed_str = 'SPEED: %d km/h' % actual_speed
                 speed_str_prv = speed_str
             except IndexError:
                 speed_str = speed_str_prv
             f_face = cv2.FONT_HERSHEY_DUPLEX
             f_scale = h / 1000
             f_thickness = 2 if h > 1000 else 1
+
             speed_w, speed_h = cv2.getTextSize(speed_str, f_face, f_scale, f_thickness)[0]
             speed_pt = (0, speed_h + int(h / 100))
-            speed_color = [255, 255, 255]
+            color = [255, 255, 255]
             speed_bg = [0, 255, 0]
-            if real_height is not None:
-                if el['velocity'] > 10*math.sqrt(estimated_distance):
-                    speed_bg = [255, 0, 0]
+            distance_bg = [0, 255, 0]
+
+            if actual_speed != None and actual_speed > ts_limit:
+                speed_bg = [0, 0, 255]
+
             cv2.rectangle(img_numpy, (0, 0), (speed_w, speed_h + int(h / 100) * 2), speed_bg, -1)
-            cv2.putText(img_numpy, speed_str, speed_pt, f_face, f_scale, speed_color, f_thickness,
+            cv2.putText(img_numpy, speed_str, speed_pt, f_face, f_scale, color, f_thickness,
                         cv2.LINE_AA)
+
+            if estimated_distance is not None:
+                distance_str = 'DISTANCE: %.2f m' % estimated_distance
+                distance_w, distance_h = cv2.getTextSize(distance_str, f_face, f_scale, f_thickness)[0]
+                distance_pt = (0, speed_h + distance_h + 2 * int(h / 100))
+
+                if actual_speed != None and actual_speed > 10 * math.sqrt(estimated_distance):
+                    distance_bg = [0, 0, 255]
+
+                cv2.rectangle(img_numpy, (0, speed_h + int(h / 100) * 2),
+                              (distance_w, speed_h + distance_h + int(h / 100) * 4), distance_bg, -1)
+                cv2.putText(img_numpy, distance_str, distance_pt, f_face, f_scale, color, f_thickness,
+                            cv2.LINE_AA)
+
             frame_index += 1
 
     return img_numpy
