@@ -136,11 +136,16 @@ def parse_args(argv=None):
                         help='When display results for traffic sign, split speed limit traffic sign and unknown')
     parser.add_argument('--distance', default=None, type=str,
                         help='When display results for distance estimation from preceding vehicle')
-    parser.add_argument('--image_center', default=1024, type=int,
+    parser.add_argument('--image_center', default=1333, type=int,
                         help='Center of the image (or principal point) in pixel')
-    parser.add_argument('--focal_length', default=2265.30179, type=float,
+    parser.add_argument('--focal_length', default=1490.64, type=float,
                         help='Focal length of the camera (fy) in pixel')
-    #366.03
+    # Cityscapes:
+    # focal_length : 2265.30
+    #--image_center : 1024
+    # Low Quality:
+    # focal_length : 366.03
+    # --image_center : 329
 
     parser.set_defaults(no_bar=False, display=False, resume=False, output_coco_json=False, output_web_json=False,
                         shuffle=False,
