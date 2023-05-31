@@ -2,7 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="63d4c7d7-04a5-49a2-bd66-bf4a922ca1f8" name="Changes" comment="files managing">
-      <change afterPath="$PROJECT_DIR$/../../YOLACT/parameters.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../../YOLACT/utils/frr/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../../YOLACT/utils/frr/base.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../../YOLACT/utils/frr/core.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../../YOLACT/utils/frr/utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../YOLACT/eval.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../YOLACT/eval.py" afterDir="false" />
     </list>
@@ -215,7 +218,7 @@
       <workItem from="1684655050835" duration="63000" />
       <workItem from="1684677565917" duration="4721000" />
       <workItem from="1684739307933" duration="2465000" />
-      <workItem from="1685544449465" duration="3517000" />
+      <workItem from="1685544449465" duration="6169000" />
     </task>
     <task id="LOCAL-00001" summary="files managing">
       <created>1682930472340</created>
