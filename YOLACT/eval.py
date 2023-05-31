@@ -140,7 +140,7 @@ def parse_args(argv=None):
                         help='Center of the image (or principal point) in pixel')
     parser.add_argument('--focal_length', default=2265.30179, type=float,
                         help='Focal length of the camera (fy) in pixel')
-    #366.03
+    # 366.03
 
     parser.set_defaults(no_bar=False, display=False, resume=False, output_coco_json=False, output_web_json=False,
                         shuffle=False,
@@ -185,13 +185,15 @@ PIXEL_OFFSET = 3
 MAX_OFFSET = 400
 NUM_FRAME_WINDOW = 5
 NUM_FRAME_ACTIVATION = 4
-NUM_FRAME_VALID_TS = 10*30
+NUM_FRAME_VALID_TS = 10 * 30
 frame_index = 0
 speed_str_prv = ''
 ts_limit = 9999
 num_detection = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 activated_ts = []
-#gtsr_net=None
+
+
+# gtsr_net=None
 
 
 def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_color=False, mask_alpha=0.45,
@@ -312,14 +314,14 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
     global activated_ts
     global ts_limit
 
-    if frame_index%NUM_FRAME_WINDOW == 0:
-      for i in range(len(activated_ts) - 1, -1, -1):
-          if abs ((frame_index - activated_ts[i][1]) > NUM_FRAME_VALID_TS):
-              del activated_ts[i]
-      for i in range(len(num_detection)):
-          if num_detection[i] >= NUM_FRAME_ACTIVATION:
-              activated_ts.append((i, frame_index))
-          num_detection[i]=0
+    if frame_index % NUM_FRAME_WINDOW == 0:
+        for i in range(len(activated_ts) - 1, -1, -1):
+            if abs((frame_index - activated_ts[i][1]) > NUM_FRAME_VALID_TS):
+                del activated_ts[i]
+        for i in range(len(num_detection)):
+            if num_detection[i] >= NUM_FRAME_ACTIVATION:
+                activated_ts.append((i, frame_index))
+            num_detection[i] = 0
 
     if args.display_text or args.display_bboxes:
         x_nearest_frontal_box = 999999
@@ -358,7 +360,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                             pred = _output.data.max(1, keepdim=True)[1]
                             _class = mapping[pred.data.item()]
 
-                            if  _class == 'Speed Limit 20Kph':
+                            if _class == 'Speed Limit 20Kph':
                                 ts_limit = 20
                             elif _class == 'Speed Limit 30Kph':
                                 ts_limit = 30
@@ -406,15 +408,15 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                             y2_nearest = y2
 
                 if label == 'traffic sign' and pred is not None:
-                  present = False
-                  for i in range (len(activated_ts)):
-                      try:
-                          if pred == activated_ts[i][0]:
-                              present = True
-                      except:
-                          ...
-                  if not present:
-                    continue
+                    present = False
+                    for i in range(len(activated_ts)):
+                        try:
+                            if pred == activated_ts[i][0]:
+                                present = True
+                        except:
+                            ...
+                    if not present:
+                        continue
 
                 text_str = '%s: %.2f' % (_class, score) if args.display_scores else _class
 
@@ -431,8 +433,8 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                             cv2.LINE_AA)
 
-                #list(mapping.values()).index("Yield")
-                if label == 'traffic sign' and (_class == "Stop" or _class == "Yield") :
+                # list(mapping.values()).index("Yield")
+                if label == 'traffic sign' and (_class == "Stop" or _class == "Yield"):
                     estimated_distance_ts = args.focal_length * REAL_TRAFFIC_SIGN_HEIGHT / (_h)
 
                     text_str = 'Distance to %s: %.2f m' % (_class, estimated_distance_ts)
@@ -487,7 +489,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
             speed_bg = [0, 255, 0]
             distance_bg = [0, 255, 0]
 
-            if actual_speed != None and actual_speed > ts_limit:
+            if actual_speed is not None and actual_speed > ts_limit:
                 speed_bg = [0, 0, 255]
 
             cv2.rectangle(img_numpy, (0, 0), (speed_w, speed_h + int(h / 100) * 2), speed_bg, -1)
@@ -895,6 +897,22 @@ class CustomDataParallel(torch.nn.DataParallel):
         return sum(outputs, [])
 
 
+def get_params_from_json():
+    try:
+        f = open("parameters.json", "r")
+    except IOError:
+        print("Error: Json file with camera parameters does not appear to exist.")
+        return -1
+
+    data = json.load(f)
+
+    ret = data['Camera calibrated']
+    camera_matrix = np.asarray(data['Camera matrix'])
+    dist = np.asarray(data['Distorsion Parameters'])
+
+    return ret, camera_matrix, dist
+
+
 def evalvideo(net: Yolact, path: str, out_path: str = None, gtsr_net=None):
     # If the path is a digit, parse it as a webcam index
     is_webcam = path.isdigit()
@@ -930,6 +948,13 @@ def evalvideo(net: Yolact, path: str, out_path: str = None, gtsr_net=None):
     vid_done = False
     frames_displayed = 0
 
+    #custom video preprocessing
+    ret, cameraMatrix, dist = get_params_from_json()
+    newCameraMatrix, roi = cv2.getOptimalNewCameraMatrix(cameraMatrix, dist, (frame_width, frame_height), 0,
+                                                         (frame_width, frame_height))
+
+    mapx, mapy = cv2.initUndistortRectifyMap(cameraMatrix, dist, None, newCameraMatrix, (frame_width, frame_height), 5)
+
     if out_path is not None:
         out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), target_fps, (frame_width, frame_height))
 
@@ -948,6 +973,12 @@ def evalvideo(net: Yolact, path: str, out_path: str = None, gtsr_net=None):
             frame = vid.read()[1]
             if frame is None:
                 return frames
+
+            # custom video preprocessing
+            frame = cv2.remap(frame, mapx, mapy, cv2.INTER_LINEAR)
+            frame = cv2.GaussianBlur(frame, (3, 3), 0)
+            frame = cv2.convertScaleAbs(frame, alpha=1, beta=0)
+
             frames.append(frame)
         return frames
 
@@ -971,7 +1002,8 @@ def evalvideo(net: Yolact, path: str, out_path: str = None, gtsr_net=None):
     def prep_frame(inp, fps_str):
         with torch.no_grad():
             frame, preds = inp
-            return prep_display(preds, frame, None, None, gtsr_net=gtsr_net, undo_transform=False, class_color=True, fps_str=fps_str)
+            return prep_display(preds, frame, None, None, gtsr_net=gtsr_net, undo_transform=False, class_color=True,
+                                fps_str=fps_str)
 
     frame_buffer = Queue()
     video_fps = 0
@@ -1149,7 +1181,7 @@ def evaluate(net: Yolact, dataset, gtsr_net=None, train_mode=False):
         evalimages(net, inp, out, gtsr_net=gtsr_net)
         return
     elif args.video is not None:
-        with open('/content/drive/MyDrive/computer_vision_project/YOLACT/GPSData.json') as json_file:
+        with open('GPSData.json') as json_file:
             data = json.load(json_file)
         global video_info
         if ':' in args.video:
