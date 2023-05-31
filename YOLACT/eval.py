@@ -4,6 +4,7 @@ import re
 import torchvision.transforms
 
 from data import COCODetection, get_label_map, MEANS, COLORS
+from utils.frr.core import FastReflectionRemoval
 from yolact import Yolact
 from utils.augmentations import BaseTransform, FastBaseTransform, Resize
 from utils.functions import MovingAverage, ProgressBar
@@ -193,9 +194,6 @@ num_detection = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 activated_ts = []
 
 
-# gtsr_net=None
-
-
 def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_color=False, mask_alpha=0.45,
                  fps_str='',
                  path=''):
@@ -344,10 +342,18 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                         _h = y2 - y1
                         _w = x2 - x1
                         if _w > 20 and _h > 20 and (_w <= _h + _h / 2) and (_h <= _w + _w / 2):
-                            ts = img[y1:y2, x1:x2, :].permute(2, 0, 1)
+                            ts = img[y1:y2, x1:x2, :]
+
+                            # FRR preprocessing
+                            frr_alg = FastReflectionRemoval(h=0.03, M=_h, N=_w)
+                            ts = frr_alg.remove_reflection(ts.cpu().numpy())
+                            ts = torch.from_numpy(ts).cuda().float()
+
+                            ts = ts.permute(2, 0, 1)
                             ts = ts[(2, 1, 0), :, :].contiguous()
                             # ts = img[y1:y2, x1:x2, :].permute(2, 0, 1)
                             _output = torch.zeros(len(mapping.items()), dtype=torch.float32)
+
                             # for i in range(0, len(transforms)):
                             #     data = transforms[i](ts)
                             #     data = data.unsqueeze(0)
