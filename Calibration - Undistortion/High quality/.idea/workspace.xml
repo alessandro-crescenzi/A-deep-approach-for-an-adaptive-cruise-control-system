@@ -2,15 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="63d4c7d7-04a5-49a2-bd66-bf4a922ca1f8" name="Changes" comment="files managing">
-      <change beforePath="$PROJECT_DIR$/.idea/High quality.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/High quality.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../../YOLACT/parameters.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/calibrated_videos/prova.MP4" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/video_preprocessing.py" beforeDir="false" afterPath="$PROJECT_DIR$/video_preprocessing.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/video_undistortion.py" beforeDir="false" afterPath="$PROJECT_DIR$/video_undistortion.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../Low quality/.idea/Low quality.iml" beforeDir="false" afterPath="$PROJECT_DIR$/../Low quality/.idea/Low quality.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../Low quality/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../Low quality/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../Low quality/video_undistortion.py" beforeDir="false" afterPath="$PROJECT_DIR$/../Low quality/video_undistortion.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../YOLACT/eval.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../YOLACT/eval.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -221,6 +215,7 @@
       <workItem from="1684655050835" duration="63000" />
       <workItem from="1684677565917" duration="4721000" />
       <workItem from="1684739307933" duration="2465000" />
+      <workItem from="1685544449465" duration="3517000" />
     </task>
     <task id="LOCAL-00001" summary="files managing">
       <created>1682930472340</created>
