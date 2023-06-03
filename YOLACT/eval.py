@@ -137,11 +137,8 @@ def parse_args(argv=None):
                         help='When display results for traffic sign, split speed limit traffic sign and unknown')
     parser.add_argument('--distance', default=None, type=str,
                         help='When display results for distance estimation from preceding vehicle')
-    parser.add_argument('--image_center', default=1024, type=int,
-                        help='Center of the image (or principal point) in pixel')
-    parser.add_argument('--focal_length', default=2265.30179, type=float,
-                        help='Focal length of the camera (fy) in pixel')
-    # 366.03
+    parser.add_argument('--resolution', default="high_quality", type=str,
+                        help='Resolution of the video/image in input (low_quality, high_quality)')
 
     parser.set_defaults(no_bar=False, display=False, resume=False, output_coco_json=False, output_web_json=False,
                         shuffle=False,
@@ -183,6 +180,7 @@ REAL_CAR_HEIGHT = 1.56
 REAL_TRUCK_HEIGHT = 3.20
 REAL_TRAFFIC_SIGN_HEIGHT = 0.6
 PIXEL_OFFSET = 3
+DISTANCE_OFFSET = 3
 MAX_OFFSET = 400
 NUM_FRAME_WINDOW = 5
 NUM_FRAME_ACTIVATION = 4
@@ -192,6 +190,8 @@ speed_str_prv = ''
 ts_limit = 9999
 num_detection = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 activated_ts = []
+focal_length = None
+principal_point = None
 
 
 def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_color=False, mask_alpha=0.45,
@@ -311,6 +311,8 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
     global speed_str_prv
     global activated_ts
     global ts_limit
+    global focal_length
+    global principal_point
 
     if frame_index % NUM_FRAME_WINDOW == 0:
         for i in range(len(activated_ts) - 1, -1, -1):
@@ -405,7 +407,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
 
                         x_center = (x1 + x2) / 2
 
-                        if (abs(args.image_center - x_center) < abs(args.image_center - x_nearest_frontal_box)):
+                        if (abs(principal_point - x_center) < abs(principal_point - x_nearest_frontal_box)):
                             x_nearest_frontal_box = x_center
 
                             x1_nearest = x1
@@ -439,9 +441,8 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                             cv2.LINE_AA)
 
-                # list(mapping.values()).index("Yield")
                 if label == 'traffic sign' and (_class == "Stop" or _class == "Yield"):
-                    estimated_distance_ts = args.focal_length * REAL_TRAFFIC_SIGN_HEIGHT / (_h)
+                    estimated_distance_ts = max(0, focal_length * REAL_TRAFFIC_SIGN_HEIGHT / (_h) - DISTANCE_OFFSET)
 
                     text_str = 'Distance to %s: %.2f m' % (_class, estimated_distance_ts)
 
@@ -453,25 +454,9 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                     cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
                                 cv2.LINE_AA)
 
-        if args.display_text and real_height is not None and abs(args.image_center - x_center) < MAX_OFFSET:
+        if args.display_text and real_height is not None and abs(principal_point - x_center) < MAX_OFFSET:
             # Estimate distance
-            estimated_distance = args.focal_length * real_height / (y2_nearest - y1_nearest - PIXEL_OFFSET)
-
-            '''
-            font_face = cv2.FONT_HERSHEY_DUPLEX
-            font_scale = 1.2
-            font_thickness = 1
-
-            text_w, _ = cv2.getTextSize(text_str, font_face, font_scale, font_thickness)[0]
-
-            text_pt = (x1_nearest + round((x2_nearest - x1_nearest) / 2 - text_w / 2),
-                       y1_nearest + round((y2_nearest - y1_nearest) / 2))
-            text_color = [255, 255, 255]
-
-            cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
-                        cv2.LINE_AA)
-                        
-            '''
+            estimated_distance = max (0, focal_length * real_height / (y2_nearest - y1_nearest - PIXEL_OFFSET) - DISTANCE_OFFSET)
 
         if args.video is not None:
             speed_str_prv = ''
@@ -904,8 +889,14 @@ class CustomDataParallel(torch.nn.DataParallel):
 
 
 def get_params_from_json():
+    global focal_length
+    global principal_point
+
     try:
-        f = open("parameters.json", "r")
+        if args.resolution == "high_quality":
+            f = open("parameters_high_quality.json", "r")
+        elif args.resolution == "low_quality":
+            f = open("parameters_low_quality.json", "r")
     except IOError:
         print("Error: Json file with camera parameters does not appear to exist.")
         return -1
@@ -915,6 +906,9 @@ def get_params_from_json():
     ret = data['Camera calibrated']
     camera_matrix = np.asarray(data['Camera matrix'])
     dist = np.asarray(data['Distorsion Parameters'])
+
+    focal_length = camera_matrix[1][1]
+    principal_point = round(camera_matrix[0][2])
 
     return ret, camera_matrix, dist
 
@@ -982,7 +976,7 @@ def evalvideo(net: Yolact, path: str, out_path: str = None, gtsr_net=None):
 
             # custom video preprocessing
             frame = cv2.remap(frame, mapx, mapy, cv2.INTER_LINEAR)
-            frame = cv2.GaussianBlur(frame, (3, 3), 0)
+            frame = cv2.GaussianBlur(frame, (5, 5), 0)
             frame = cv2.convertScaleAbs(frame, alpha=1, beta=0)
 
             frames.append(frame)
