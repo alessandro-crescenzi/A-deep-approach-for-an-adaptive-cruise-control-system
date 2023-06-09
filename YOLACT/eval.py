@@ -179,6 +179,7 @@ mapping = {
 REAL_CAR_HEIGHT = 1.56
 REAL_TRUCK_HEIGHT = 3.20
 REAL_TRAFFIC_SIGN_HEIGHT = 0.6
+REACTION_TIME = 1
 PIXEL_OFFSET = 3
 DISTANCE_OFFSET = 3
 MAX_OFFSET = 400
@@ -446,12 +447,16 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
 
                     text_str = 'Distance to %s: %.2f m' % (_class, estimated_distance_ts)
 
-                    text_pt = (0, h - 3)
-                    text_color = [255, 255, 255]
-                    text_w, text_h = cv2.getTextSize(text_str, font_face, font_scale, font_thickness)[0]
+                    f_face = cv2.FONT_HERSHEY_DUPLEX
+                    f_scale = h / 1000
+                    f_thickness = 2 if h > 1000 else 1
 
-                    cv2.rectangle(img_numpy, (0, h), (text_w, h - text_h - 6), [0, 0, 0], -1)
-                    cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness,
+                    distance_pt = (0, h - 6)
+                    text_color = [255, 255, 255]
+                    text_w, text_h = cv2.getTextSize(text_str, f_face, f_scale, f_thickness)[0]
+
+                    cv2.rectangle(img_numpy, (0, h - text_h - 6), (text_w, h), [255, 0, 0], -1)
+                    cv2.putText(img_numpy, text_str, distance_pt, f_face, f_scale, text_color, f_thickness,
                                 cv2.LINE_AA)
 
         if args.display_text and real_height is not None and abs(principal_point - x_center) < MAX_OFFSET:
@@ -492,7 +497,8 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                 distance_w, distance_h = cv2.getTextSize(distance_str, f_face, f_scale, f_thickness)[0]
                 distance_pt = (0, speed_h + distance_h + 2 * int(h / 100))
 
-                if actual_speed != None and actual_speed > 10 * math.sqrt(estimated_distance):
+                #Safety distance
+                if actual_speed != None and (actual_speed/3.6)*REACTION_TIME > estimated_distance:
                     distance_bg = [0, 0, 255]
 
                 cv2.rectangle(img_numpy, (0, speed_h + int(h / 100) * 2),
