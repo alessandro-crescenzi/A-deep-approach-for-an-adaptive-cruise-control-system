@@ -461,7 +461,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
 
         if args.display_text and real_height is not None and abs(principal_point - x_center) < MAX_OFFSET:
             # Estimate distance
-            estimated_distance = max (0, focal_length * real_height / (y2_nearest - y1_nearest - PIXEL_OFFSET) - DISTANCE_OFFSET)
+            estimated_distance = max (0, focal_length * real_height / (y2_nearest - y1_nearest - PIXEL_OFFSET))
 
         if args.video is not None:
             speed_str_prv = ''
