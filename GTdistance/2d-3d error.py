@@ -17,6 +17,7 @@ REAL_CAR_HEIGHT = 1.56
 REAL_TRUCK_WIDTH = 2.36
 REAL_TRUCK_HEIGHT = 3.20
 PIXEL_OFFSET = 3
+DISTANCE_OFFSET = 1
 IMAGE_CENTER = 1024
 MAX_OFFSET = 400
 
@@ -108,11 +109,11 @@ def getGTimages():
                         cv2.imwrite(res_filename, img)
                         continue
                     if is_car:
-                        estimated_distance_height = fy * REAL_CAR_HEIGHT / (y2 - y1 - PIXEL_OFFSET)
-                        estimated_distance_width = fx * REAL_CAR_WIDTH / (x2 - x1 - PIXEL_OFFSET)
+                        estimated_distance_height = fy * REAL_CAR_HEIGHT / (y2 - y1 - PIXEL_OFFSET) - DISTANCE_OFFSET
+                        estimated_distance_width = fx * REAL_CAR_WIDTH / (x2 - x1 - PIXEL_OFFSET) - DISTANCE_OFFSET
                     else:
-                        estimated_distance_height = fy * REAL_TRUCK_HEIGHT / (y2 - y1 - PIXEL_OFFSET)
-                        estimated_distance_width = fx * REAL_TRUCK_WIDTH / (x2 - x1 - PIXEL_OFFSET)
+                        estimated_distance_height = fy * REAL_TRUCK_HEIGHT / (y2 - y1 - PIXEL_OFFSET) - DISTANCE_OFFSET
+                        estimated_distance_width = fx * REAL_TRUCK_WIDTH / (x2 - x1 - PIXEL_OFFSET) - DISTANCE_OFFSET
 
                     error_height.append(abs(real_distance - estimated_distance_height))
                     error_width.append(abs(real_distance-estimated_distance_width))

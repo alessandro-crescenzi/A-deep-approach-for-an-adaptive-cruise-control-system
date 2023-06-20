@@ -123,7 +123,7 @@ def parse_args(argv=None):
                         help='A path to a video to evaluate on. Passing in a number will use that index webcam.')
     parser.add_argument('--video_multiframe', default=4, type=int,
                         help='The number of frames to evaluate in parallel to make videos play at higher fps.')
-    parser.add_argument('--score_threshold', default=0.20, type=float,
+    parser.add_argument('--score_threshold', default=0.30, type=float,
                         help='Detections with a score under this threshold will not be considered. This currently only works in display mode.')
     parser.add_argument('--dataset', default=None, type=str,
                         help='If specified, override the dataset specified in the config with this one (example: coco2017_dataset).')
@@ -181,7 +181,7 @@ REAL_TRUCK_HEIGHT = 3.20
 REAL_TRAFFIC_SIGN_HEIGHT = 0.6
 REACTION_TIME = 1
 PIXEL_OFFSET = 3
-DISTANCE_OFFSET = 3
+DISTANCE_OFFSET = 1
 MAX_OFFSET = 400
 NUM_FRAME_WINDOW = 5
 NUM_FRAME_ACTIVATION = 4
@@ -400,7 +400,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
                     if _class == 'Unknown' or _class == 'traffic sign':
                         continue
                 if args.distance is not None:
-                    if _class == 'car' or _class == 'truck':
+                    if _class == 'car' or _class == 'truck' or _class == 'bus':
                         if _class == 'car':
                             real_height = REAL_CAR_HEIGHT
                         else:
@@ -461,7 +461,7 @@ def prep_display(dets_out, img, h, w, gtsr_net=None, undo_transform=True, class_
 
         if args.display_text and real_height is not None and abs(principal_point - x_center) < MAX_OFFSET:
             # Estimate distance
-            estimated_distance = max (0, focal_length * real_height / (y2_nearest - y1_nearest - PIXEL_OFFSET))
+            estimated_distance = max (0, focal_length * real_height / (y2_nearest - y1_nearest - PIXEL_OFFSET) - DISTANCE_OFFSET)
 
         if args.video is not None:
             speed_str_prv = ''
