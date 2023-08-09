@@ -1,9 +1,10 @@
-torch~=2.0.0+cu117
-numpy==1.24.2
-torchvision~=0.15.0.dev20221111+cu116
-Pillow==9.4.0
+torch==2.0.1+cu117
+torchvision==0.15.2+cu117
+--find-links https://download.pytorch.org/whl/torch_stable.html
+numpy==1.24.4
+Pillow==10.0.0
 pycocotools~=2.0.6
 matplotlib~=3.7.1
-opencv-python==4.7.0.72
-setuptools==67.6.0
-tqdm~=4.65.0
+opencv-python==4.8.0.76
+setuptools==68.0.0
+tqdm==4.66.0
