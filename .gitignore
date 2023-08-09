@@ -153,16 +153,18 @@ dmypy.json
 cython_debug/
 
 # PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
-# video files
-*.MP4
-*.mp4
+# ignore net weights
+weights/
+GTSRB/weights/
+# exceptions
+!weights/.gitkeep
+!GTSRB/weights/.gitkeep
 
-#YOLACT folder
-./YOLACT/weights
-/YOLACT/data/cityscapes/images
+# ignore test videos
+videos/high_quality/
+videos/low_quality/
+# exceptions
+!videos/high_quality/.gitkeep
+!videos/low_quality/.gitkeep
