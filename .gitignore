@@ -156,15 +156,15 @@ cython_debug/
 .idea/
 
 # ignore net weights
-weights
-GTSRB/weights
+weights/
+GTSRB/weights/
 # exceptions
 !weights/.gitkeep
 !GTSRB/weights/.gitkeep
 
 # ignore test videos
-videos/high_quality
-videos/low_quality
+videos/high_quality/
+videos/low_quality/
 # exceptions
 !videos/high_quality/.gitkeep
 !videos/low_quality/.gitkeep
