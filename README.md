@@ -1,3 +1,15 @@
+# A deep approach for an adaptive cruise control system
+
+
+
+
+
+
+
+
+
+
+
 You can follow these command to execute the complete network on an offline video (you can choose one of ours videos from the `./videos` folder):
 
 - If you want to evaluate high_quality videos you must specify `--resolution=high_quality`
