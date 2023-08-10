@@ -1,48 +1,34 @@
-import math
+import argparse
+import json
+import os
+import pickle
+import random
 import re
+import time
+from collections import OrderedDict
+from collections import defaultdict
+from pathlib import Path
 
-import torchvision.transforms
-
-from data import COCODetection, get_label_map, MEANS, COLORS
-from utils.frr.core import FastReflectionRemoval
-from yolact import Yolact
-from utils.augmentations import BaseTransform, FastBaseTransform, Resize
-from utils.functions import MovingAverage, ProgressBar
-from layers.box_utils import jaccard, center_size, mask_iou
-from utils import timer
-from utils.functions import SavePath
-from layers.output_utils import postprocess, undo_image_transformation
-import pycocotools
-from data import cfg, set_cfg, set_dataset
-
+import cv2
+import matplotlib.pyplot as plt
 import numpy as np
+import pycocotools
 import torch
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
-import torch.nn.functional as F
-from torchvision.utils import save_image
-import argparse
-import time
-import random
-import cProfile
-import pickle
-import json
-import os
-from collections import defaultdict
-from pathlib import Path
-from collections import OrderedDict
-from PIL import Image
+
 from GTSRB.model import ResnetGTSRB, StnGTSRB
-import time
-import matplotlib.pyplot as plt
-import cv2
-
-# from GTSRB.data import data_transforms, data_jitter_hue, data_jitter_brightness, data_jitter_saturation, \
-#     data_jitter_contrast, data_blur, data_rotate, data_center, data_affine, data_perspective  # data
-# transforms = [data_transforms, data_jitter_hue, data_jitter_brightness, data_jitter_saturation,
-#               data_jitter_contrast, data_blur, data_rotate, data_center, data_affine, data_perspective]
-
 from GTSRB.utils.eval_transformation import *
+from data import COCODetection, get_label_map, COLORS
+from data import cfg, set_cfg, set_dataset
+from layers.box_utils import jaccard, mask_iou
+from layers.output_utils import postprocess, undo_image_transformation
+from utils import timer
+from utils.augmentations import BaseTransform, FastBaseTransform
+from utils.frr.core import FastReflectionRemoval
+from utils.functions import MovingAverage, ProgressBar
+from utils.functions import SavePath
+from yolact import Yolact
 
 transforms = [basic_transformation, imadjust_transformation, histeq_transformation, adapthisteq_transformation,
               conorm_transformation]
@@ -82,7 +68,8 @@ def parse_args(argv=None):
     parser.add_argument('--display', dest='display', action='store_true',
                         help='Display qualitative results instead of quantitative ones.')
     parser.add_argument('--shuffle', dest='shuffle', action='store_true',
-                        help='Shuffles the images when displaying them. Doesn\'t have much of an effect when display is off though.')
+                        help='Shuffles the images when displaying them. Doesn\'t have much of an effect when display '
+                             'is off though.')
     parser.add_argument('--ap_data_file', default='results/ap_data.pkl', type=str,
                         help='In quantitative mode, the file to save detections before calculating mAP.')
     parser.add_argument('--resume', dest='resume', action='store_true',
@@ -90,7 +77,8 @@ def parse_args(argv=None):
     parser.add_argument('--max_images', default=-1, type=int,
                         help='The maximum number of images from the dataset to consider. Use -1 for all.')
     parser.add_argument('--output_coco_json', dest='output_coco_json', action='store_true',
-                        help='If display is not set, instead of processing IoU values, this just dumps detections into the coco json file.')
+                        help='If display is not set, instead of processing IoU values, this just dumps detections '
+                             'into the coco json file.')
     parser.add_argument('--bbox_det_file', default='results/bbox_detections.json', type=str,
                         help='The output file for coco bbox results if --coco_results is set.')
     parser.add_argument('--mask_det_file', default='results/mask_detections.json', type=str,
@@ -98,7 +86,8 @@ def parse_args(argv=None):
     parser.add_argument('--config', default=None,
                         help='The config object to use.')
     parser.add_argument('--output_web_json', dest='output_web_json', action='store_true',
-                        help='If display is not set, instead of processing IoU values, this dumps detections for usage with the detections viewer web thingy.')
+                        help='If display is not set, instead of processing IoU values, this dumps detections for '
+                             'usage with the detections viewer web thingy.')
     parser.add_argument('--web_det_path', default='web/dets/', type=str,
                         help='If output_web_json is set, this is the path to dump detections into.')
     parser.add_argument('--no_bar', dest='no_bar', action='store_true',
@@ -110,7 +99,8 @@ def parse_args(argv=None):
     parser.add_argument('--no_sort', default=False, dest='no_sort', action='store_true',
                         help='Do not sort images by hashed image ID.')
     parser.add_argument('--seed', default=None, type=int,
-                        help='The seed to pass into random.seed. Note: this is only really for the shuffle and does not (I think) affect cuda stuff.')
+                        help='The seed to pass into random.seed. Note: this is only really for the shuffle and does '
+                             'not (I think) affect cuda stuff.')
     parser.add_argument('--mask_proto_debug', default=False, dest='mask_proto_debug', action='store_true',
                         help='Outputs stuff for scripts/compute_mask.py.')
     parser.add_argument('--no_crop', default=False, dest='crop', action='store_false',
@@ -118,17 +108,21 @@ def parse_args(argv=None):
     parser.add_argument('--image', default=None, type=str,
                         help='A path to an image to use for display.')
     parser.add_argument('--images', default=None, type=str,
-                        help='An input folder of images and output folder to save detected images. Should be in the format input->output.')
+                        help='An input folder of images and output folder to save detected images. Should be in the '
+                             'format input->output.')
     parser.add_argument('--video', default=None, type=str,
                         help='A path to a video to evaluate on. Passing in a number will use that index webcam.')
     parser.add_argument('--video_multiframe', default=4, type=int,
                         help='The number of frames to evaluate in parallel to make videos play at higher fps.')
     parser.add_argument('--score_threshold', default=0.20, type=float,
-                        help='Detections with a score under this threshold will not be considered. This currently only works in display mode.')
+                        help='Detections with a score under this threshold will not be considered. This currently '
+                             'only works in display mode.')
     parser.add_argument('--dataset', default=None, type=str,
-                        help='If specified, override the dataset specified in the config with this one (example: coco2017_dataset).')
+                        help='If specified, override the dataset specified in the config with this one (example: '
+                             'coco2017_dataset).')
     parser.add_argument('--detect', default=False, dest='detect', action='store_true',
-                        help='Don\'t evauluate the mask branch at all and only do object detection. This only works for --display and --benchmark.')
+                        help='Don\'t evauluate the mask branch at all and only do object detection. This only works '
+                             'for --display and --benchmark.')
     parser.add_argument('--display_fps', default=False, dest='display_fps', action='store_true',
                         help='When displaying / saving video, draw the FPS on the frame')
     parser.add_argument('--emulate_playback', default=False, dest='emulate_playback', action='store_true',
