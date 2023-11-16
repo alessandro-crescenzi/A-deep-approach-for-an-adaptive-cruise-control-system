@@ -59,7 +59,7 @@ illustrated some other test examples:
 ### Contributors
 
 This project has been developed by:
-- Alessandro Crescenzi - [contact](mailto:alessandorcrescenzi [at] outlook [dot] com)
+- Alessandro Crescenzi - <alessandrocrescenzi@outlook.com>
 - Giovanni Lambertini 
 - Alvaro Gjepali
 
