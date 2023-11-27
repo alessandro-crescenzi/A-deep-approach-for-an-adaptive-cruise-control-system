@@ -17,25 +17,29 @@ requirements by launching on terminal this command:
 
 ### Test
 
-You can follow these command to execute the complete network on an offline video (you can choose one of ours videos from 
-the `./videos` folder):
+In order to correctly test the network you have to download the 2 network weights (YOLACT and GTSRB). You can download
+them from this 
+[Google Drive folder](https://drive.google.com/drive/folders/1Via4A-DmalpCfar-w_PwS00_sgeqAitx?usp=sharing).
+- put `STNgtsr_55_8736.pth` file under GTSRB folder in `./GTSRB/weights` folder of this project
+- put `yolact_base_14_5565.pth` file under YOLACT folder in `./weights` folder of this project
+
+Once that, you can follow these command to execute the complete network on an offline video (you can choose one of ours 
+videos from [this link](https://drive.google.com/drive/folders/1FZjOM-wsLqdbZlA8onLGCSWjptFIT9--?usp=drive_link), pay
+attention to the HQ and LQ folder):
 
 - If you want to evaluate high_quality videos you must specify `--resolution=high_quality`
 
 ```
-!python eval.py --trained_model=weights/yolact_base_14_5565.pth --gtsrb=GTSRB/weights/STNgtsr_55_8736.pth --top_k=15 
+python eval.py --trained_model=weights/yolact_base_14_5565.pth --gtsrb=GTSRB/weights/STNgtsr_55_8736.pth --top_k=15 
 --video_multiframe=4 --video=inputVideoPath.mp4:outputVideoPath.mp4 --distance=yes --resolution=high_quality
 ```
 
 - If you want to evaluate low_quality videos you must specify `--resolution=low_quality`
 
 ```
-!python eval.py --trained_model=weights/yolact_base_14_5565.pth --gtsrb=GTSRB/weights/STNgtsr_55_8736.pth --top_k=15 
+python eval.py --trained_model=weights/yolact_base_14_5565.pth --gtsrb=GTSRB/weights/STNgtsr_55_8736.pth --top_k=15 
 --video_multiframe=4 --video=inputVideo.mp4:outputVideo.mp4 --distance=yes --resolution=low_quality
 ```
-
-Some material for evaluation is available at
-[this link](https://drive.google.com/drive/folders/1FZjOM-wsLqdbZlA8onLGCSWjptFIT9--?usp=drive_link).
 
 If you want to test this pipeline in your own videos you have to adjust the camera parameters before launching the test.
 
